@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status, UploadFile, File
+from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordRequestForm
 import os
 import shutil
@@ -9,10 +10,19 @@ from database import engine, create_db_and_tables, TranscriptionTask, TaskStatus
 from worker import process_audio_task
 from auth import get_password_hash, verify_password, create_access_token, get_current_user
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # SRE Note: In a true multi-worker production environment, migrations 
+    # should be handled via Alembic prior to app startup. For this single-node
+    # SQLite appliance, auto-creation is acceptable.
+    create_db_and_tables()
+    yield
+
 app = FastAPI(
     title="PtClinVoice Core API",
     description="SRE-grade Local Transcription & Privacy Filter Backend",
     version="3.0.0",
+    lifespan=lifespan,
 )
 
 # SRE Note: Fallback to local ./uploads if the Docker-mounted ./data directory
@@ -24,12 +34,7 @@ except PermissionError:
     UPLOAD_DIR = "uploads"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@app.on_event("startup")
-def on_startup():
-    # SRE Note: In a true multi-worker production environment, migrations 
-    # should be handled via Alembic prior to app startup. For this single-node
-    # SQLite appliance, auto-creation is acceptable.
-    create_db_and_tables()
+
 
 @app.get("/health")
 def health_check():
