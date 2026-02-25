@@ -1,10 +1,10 @@
 import os
 import traceback
 from sqlmodel import Session
-from database import engine, TranscriptionTask, TaskStatus
-from stt_core import run_stt_isolated
-from privacy_filter import ClinicalPrivacyFilter
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.database import engine, TranscriptionTask, TaskStatus
+from app.core.stt import run_stt_isolated
+from app.core.privacy import ClinicalPrivacyFilter
+from app.core.deepseek import DeepSeekClinicalAdapter
 
 def process_audio_task(task_id: str, audio_path: str):
     """

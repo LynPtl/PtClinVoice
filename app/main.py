@@ -6,9 +6,9 @@ import shutil
 from pydantic import BaseModel
 import uuid
 from sqlmodel import Session, select
-from database import engine, create_db_and_tables, TranscriptionTask, TaskStatus, User
-from worker import process_audio_task
-from auth import get_password_hash, verify_password, create_access_token, get_current_user
+from app.database import engine, create_db_and_tables, TranscriptionTask, TaskStatus, User
+from app.worker import process_audio_task
+from app.auth import get_password_hash, verify_password, create_access_token, get_current_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

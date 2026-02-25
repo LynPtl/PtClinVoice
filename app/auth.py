@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 import jwt
 import bcrypt
 
-from database import engine, User
+from app.database import engine, User
 
 # Phase 3 Security: Zero-Trust variables
 # In production, these should be loaded from secure .env vaults

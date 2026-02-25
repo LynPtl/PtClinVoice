@@ -3,9 +3,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 import os
 
-from main import app
-from database import engine, User, create_db_and_tables
-from auth import get_password_hash
+from app.main import app
+from app.database import engine, User, create_db_and_tables
+from app.auth import get_password_hash
 
 client = TestClient(app)
 

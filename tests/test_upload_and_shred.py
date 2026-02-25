@@ -4,7 +4,7 @@ import os
 import shutil
 from fastapi.testclient import TestClient
 
-from main import app, UPLOAD_DIR
+from app.main import app, UPLOAD_DIR
 from tests.test_auth import get_token
 
 client = TestClient(app)

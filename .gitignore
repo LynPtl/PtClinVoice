@@ -1,6 +1,27 @@
+# Environment
 .venv/
-__pycache__/
 .env
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test_out.txt
+
+# Storage & Data
+data/
+uploads/
 *.db
 *.db-wal
 *.db-shm
+

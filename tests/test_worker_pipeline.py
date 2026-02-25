@@ -5,9 +5,10 @@ from unittest.mock import patch, MagicMock
 from sqlmodel import Session, select
 import json
 
-from main import app
-from database import engine, TranscriptionTask, TaskStatus, create_db_and_tables
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.main import app
+from app.database import engine, User, TranscriptionTask, TaskStatus, create_db_and_tables
+from app.core.deepseek import DeepSeekClinicalAdapter
+from app.auth import get_password_hash
 
 create_db_and_tables()
 client = TestClient(app)
@@ -27,7 +28,7 @@ MOCK_DEEPSEEK_RESPONSE_JSON = json.dumps({
 @pytest.fixture
 def mock_openai_client():
     """Mock the external cloud API to prevent bandwidth and token usage during CI/CD"""
-    with patch("deepseek_adapter.OpenAI") as mock_openai:
+    with patch("app.core.deepseek.OpenAI") as mock_openai:
         mock_client_instance = MagicMock()
         mock_response = MagicMock()
         mock_choice = MagicMock()
@@ -39,14 +40,34 @@ def mock_openai_client():
         mock_openai.return_value = mock_client_instance
         yield mock_openai
 
+@pytest.fixture(autouse=True)
+def setup_db():
+    create_db_and_tables()
+    with Session(engine) as session:
+        session.exec(User.__table__.delete())
+        session.exec(TranscriptionTask.__table__.delete())
+        session.commit()
+    yield
+
 def test_background_worker_pipeline(mock_openai_client):
     """
     Simulates a client submitting a MockTranscribeRequest to the FastAPI background queue.
     The client then polls the /tasks/{task_id} endpoint until the status reaches COMPLETED.
     """
+    # Create test user
+    with Session(engine) as session:
+        user = User(username="worker_user", hashed_password=get_password_hash("password123"))
+        session.add(user)
+        session.commit()
+    
+    # Get token
+    resp = client.post("/api/auth/login", data={"username": "worker_user", "password": "password123"})
+    token = resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     # 1. Dispatch Task
     payload = {"audio_path": AUDIO_STANDARD}
-    resp = client.post("/api/v1/transcribe/mock", json=payload)
+    resp = client.post("/api/v1/transcribe/mock", json=payload, headers=headers)
     
     assert resp.status_code == 200
     data = resp.json()
@@ -60,7 +81,7 @@ def test_background_worker_pipeline(mock_openai_client):
     final_state = None
     
     for _ in range(max_retries):
-        status_resp = client.get(f"/tasks/{task_id}")
+        status_resp = client.get(f"/tasks/{task_id}", headers=headers)
         assert status_resp.status_code == 200
         state = status_resp.json()
         

@@ -2,9 +2,9 @@ import pytest
 import json
 from unittest.mock import patch, MagicMock
 
-from stt_core import run_stt_isolated
-from privacy_filter import ClinicalPrivacyFilter
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.core.stt import run_stt_isolated
+from app.core.privacy import ClinicalPrivacyFilter
+from app.core.deepseek import DeepSeekClinicalAdapter
 
 AUDIO_STANDARD = "tests/fixtures/standard_accent.mp3"
 
@@ -26,7 +26,7 @@ def privacy_filter():
 @pytest.fixture
 def mock_openai_client():
     """Mock the external cloud API to prevent bandwidth and token usage during CI/CD integration testing."""
-    with patch("deepseek_adapter.OpenAI") as mock_openai:
+    with patch("app.core.deepseek.OpenAI") as mock_openai:
         mock_client_instance = MagicMock()
         mock_response = MagicMock()
         mock_choice = MagicMock()

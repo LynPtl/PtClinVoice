@@ -2,7 +2,7 @@ import os
 import pytest
 import numpy as np
 import wave
-from stt_core import run_stt_isolated
+from app.core.stt import run_stt_isolated
 
 # To prevent multiprocessing pickle error, keep top-level
 def malicious_oom_worker(audio_path, model_size, conn):
@@ -44,16 +44,16 @@ def test_stt_oom_isolation_survival():
     Here we mock the isolation worker to die violently (SIGKILL) pretending it ran out of memory.
     """
     import multiprocessing
-    import stt_core
+    from app.core import stt
 
-    original_worker = stt_core._stt_worker
-    stt_core._stt_worker = malicious_oom_worker
+    original_worker = stt._stt_worker
+    stt._stt_worker = malicious_oom_worker
 
     try:
         with pytest.raises(MemoryError, match="STT Process killed violently"):
-            stt_core.run_stt_isolated(AUDIO_STANDARD, model_size="tiny.en")
+            stt.run_stt_isolated(AUDIO_STANDARD, model_size="tiny.en")
             
         # The fact we reach here after raising MemoryError proves the main thread survived.
         assert True
     finally:
-        stt_core._stt_worker = original_worker
+        stt._stt_worker = original_worker

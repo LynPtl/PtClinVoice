@@ -1,6 +1,6 @@
 import os
 import json
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.core.deepseek import DeepSeekClinicalAdapter
 
 def run_real_deepseek_test():
     """

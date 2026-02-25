@@ -3,9 +3,9 @@ import json
 import time
 from dotenv import load_dotenv
 
-from stt_core import run_stt_isolated
-from privacy_filter import ClinicalPrivacyFilter
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.core.stt import run_stt_isolated
+from app.core.privacy import ClinicalPrivacyFilter
+from app.core.deepseek import DeepSeekClinicalAdapter
 
 def run_true_e2e_pipeline():
     """
@@ -30,7 +30,7 @@ def run_true_e2e_pipeline():
     llm_adapter = DeepSeekClinicalAdapter(api_key=api_key)
 
     # 2. 定位测试音频 (带有医生与患者交替对话，且包含隐私数据的测试录音)
-    audio_path = os.path.join(os.path.dirname(__file__), "tests", "fixtures", "standard_accent.mp3")
+    audio_path = os.path.join(os.path.dirname(__file__), "..", "tests", "fixtures", "standard_accent.mp3")
     if not os.path.exists(audio_path):
         print(f"❌ 找不到测试音频: {audio_path}")
         return

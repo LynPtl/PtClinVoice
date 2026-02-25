@@ -1,5 +1,5 @@
 import pytest
-from privacy_filter import ClinicalPrivacyFilter
+from app.core.privacy import ClinicalPrivacyFilter
 
 @pytest.fixture(scope="module")
 def privacy_filter():

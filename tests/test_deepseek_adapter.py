@@ -2,7 +2,7 @@ import os
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from deepseek_adapter import DeepSeekClinicalAdapter
+from app.core.deepseek import DeepSeekClinicalAdapter
 
 # Sample transcript without PII (Phase 1.3 will redact the names before this stage)
 MOCK_TRANSCRIPT = (
@@ -22,7 +22,7 @@ MOCK_DEEPSEEK_RESPONSE_JSON = json.dumps({
 
 @pytest.fixture
 def mock_openai_client():
-    with patch("deepseek_adapter.OpenAI") as mock_openai:
+    with patch("app.core.deepseek.OpenAI") as mock_openai:
         # Construct the deeply nested mock chain: client.chat.completions.create().choices[0].message.content
         mock_client_instance = MagicMock()
         mock_response = MagicMock()
