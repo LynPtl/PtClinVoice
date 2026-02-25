@@ -62,8 +62,75 @@ python3 test_real_deepseek_api.py
    ```
 至此，最底层的免费云宿主机就搭好了，后续将配合 GitHub Actions 和多架构 Docker 无缝承接构建流。
 
-### 2.2 Docker 容器云编排 (跨架构跨云迁移)
-- **预留规划**: 本项目未来的完整形态将抛弃繁杂的 `python -m venv`。在 2.1 规划的 Oracle 机器就绪后，我们将编写多架构 `Dockerfile (linux/amd64, linux/arm64)`。您只需在服务器上拉下代码并执行 `docker-compose up -d` 即可。
+### 2.2 Docker 容器云编排测试 (Phase 2.3+)
+由于我们的 `ghcr.io/lynptl/ptclinvoice:latest` 镜像是严格基于 `linux/amd64` 构建，并且全量包含好了 `12MB SpaCy` 与 `ffmpeg` 依赖底包，它非常适合在您的 Oracle VM.Standard.E5.Flex (AMD x86_64) 或其他架构上进行“即开即用”的空降测试。
+
+为了遵守我们定下的“极简与不可变基础设施”底线，您在云端实例上**完全不需要拉取整个 Git 仓库的代码**。请通过 SSH 登入您的 Oracle Cloud 实例，依次执行：
+
+#### 第一步：云端装配容器引擎 (如果未经开通)
+```bash
+# 刷新包记录并装配 Docker
+sudo apt update && sudo apt install -y docker.io docker-compose
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+# (若新将用户拉入 docker 用户组，建议退出 SSH 重登录使权限生效)
+```
+
+#### 第二步：注入隐私数据防线 (构建 `.env` 与隔离挂载点)
+```bash
+# 构建工程专属沙盒目录
+mkdir -p ~/ptclinvoice_deploy/data
+cd ~/ptclinvoice_deploy
+
+# >>> 【授权检查点】：这是您需要手工处理的唯一地方 <<<
+# 创建隐形环境变量记录表，并贴入您的真实 DeepSeek API Key
+cat << 'EOF' > .env
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EOF
+```
+
+#### 第三步：一键同步 SRE 规范编排文件
+为了让云主机复现我们本地刚写好的 SQLite WAL 防御挂载和原生 Healthcheck 探针，您**不需要手动使用 vim/nano 新建文件去粘贴**。
+
+请**直接将下方这整段 Bash 命令框里的内容完整复制**，然后粘贴到您的 SSH 终端按下回车。这条命令会自动利用内置工具在当前目录下生成配置无误的 `docker-compose.yml` 文件：
+```bash
+cat << 'EOF' > docker-compose.yml
+services:
+  ptclinvoice-api:
+    image: ghcr.io/lynptl/ptclinvoice:latest
+    container_name: ptclinvoice-api
+    restart: always
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    environment:
+      - DB_PATH=/app/data/ptclinvoice_sre.db
+      - TZ=UTC
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+EOF
+```
+
+#### 第四步：远程拉起与验收打卡
+```bash
+# 一键空降指令：强制拉取我们在 Github Actions 上刚出炉的 Phase 2.3 最新包，并在后台拉起
+sudo docker-compose pull && sudo docker-compose up -d
+
+# 立刻探活
+curl http://localhost:8000/health
+# 预期秒回：{"status": "ok", "service": "PtClinVoice API"}
+
+# (可选) 查看刚写好的 SRE 自诊断探针运行履历
+sudo docker inspect --format="{{json .State.Health}}" ptclinvoice-api
+```
+一旦走完最后一步且 `curl` 通畅无误的返回 JSON，并在浏览器能够访问 `http://<您的Oracle公网IP>:8000/docs` 查看 Swagger UI，代表部署彻底收官！
 
 ### 2.3 前端站点 CDN 加速分发 (静态资源托管)
 - **预留规划**: （Phase 4 后端联调时）指导您如何利用 Vercel, Cloudflare, 或 Nginx 将基于 React / Vite 编译出的静态病历阅览后台打包分发到全球边缘节点。
