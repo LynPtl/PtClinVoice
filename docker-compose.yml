@@ -7,6 +7,12 @@ services:
     restart: always # Automatically restart on crash or server reboot
     ports:
       - "8000:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
     environment:
       # SRE Note: The .env file on the host machine will automatically be parsed
       # and the DEEPSEEK_API_KEY will be pushed here.
