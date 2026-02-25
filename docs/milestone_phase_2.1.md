@@ -21,7 +21,7 @@
 新增的测试文件 `tests/test_database.py` 证明了 WAL 机制的有效性：
 *   **方法论**: 借助 `pytest-asyncio` 与 `asyncio.gather`，瞬间投递了 100 个模拟异步任务（经历从创建到更新至完成的 3 次完整提交操作）至本地数据库。
 *   **结果**: 全链路 300 次并发事务在 0.52 秒内悉数执行完成，期间数据库未触发任何死锁异常。
-*   详情可见：[Phase 2 QA Testing Report](./qa_testing_report_phase_2.md)。
+*   详情可见：[Phase 2 QA Testing Report](./qa_testing_report_phase_2.1.md)。
 
 ### 遗留问题与下一步 (Next Steps)
 - 为 CI/CD 管道集成构建多架构 Dockerfile (`linux/amd64` 与 `linux/arm64`) 支持 (Phase 2.2)。

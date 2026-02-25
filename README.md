@@ -85,4 +85,4 @@ pytest tests/test_database.py -v
 所有的技术重构方案、避坑防雷指南均保存在 `docs` 归档区：
 1. **[架构开发日志]** API 骨架与 DB WAL: [`docs/milestone_phase_2.1.md`](docs/milestone_phase_2.1.md)
 2. **[架构开发日志]** 容器编译流水线: [`docs/milestone_phase_2.2.md`](docs/milestone_phase_2.2.md)
-3. **[SRE 并发测试报告]** `docs/qa_testing_report_phase_2.md` 与 `docs/qa_testing_report_phase_2.2.md`
+3. **[SRE 并发测试报告]** `docs/qa_testing_report_phase_2.1.md` 与 `docs/qa_testing_report_phase_2.2.md`
