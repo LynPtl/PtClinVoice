@@ -62,8 +62,8 @@
 
 ### Phase 2: 基础设施、后端骨架与 CI/CD (Infrastructure & DevOps)
 *   **目标**: 建立工程化的 API 服务，部署基础架构监控，并打通持续集成流水线。
-*   [ ] **2.1 Docker & CI/CD**: 编写 `Dockerfile` (`python:3.10-slim` + `ffmpeg`)。在 GitHub Actions 中配置 Pipeline，实现代码提交后自动执行单元测试并打 tag。
-*   [ ] **2.2 API 骨架与 DB WAL**: 引入 FastAPI 与 SQLite/SQLModel。定义可靠的状态机并**开启 WAL 模式**。**【配套测试】(Concurrent WAL Test)** 编写并发脚本 (e.g. `pytest-asyncio` 等) 模拟 100+ 请求瞬时并发写入/更新，断言不死锁雪崩。
+*   [ ] **2.1 API 骨架与 DB WAL**: 引入 FastAPI 与 SQLite/SQLModel。定义可靠的状态机并**开启 WAL 模式**。**【配套测试】(Concurrent WAL Test)** 编写并发脚本 (e.g. `pytest-asyncio` 等) 模拟 100+ 请求瞬时并发写入/更新，断言不死锁雪崩。
+*   [ ] **2.2 Docker & CI/CD (多架构构建)**: 基于 API 骨架编写 `Dockerfile` (`python:3.10-slim` + `ffmpeg`)。实现在 Oracle Cloud 免费 ARM64 实例的计算模式切换。在 GitHub Actions 中配置 Pipeline。
 *   [ ] **2.3 容灾级任务 Worker**: 编写独立 `worker.py`，使用 `multiprocessing` 孵化子进程以免 OOM 波及主进程。**【配套测试】(OOM Survival)** 发起恶意的内存耗尽 Mock 任务，验证子进程被 Kernel 猎杀后主进程仍然健康。
 *   [ ] **2.4 极简 SSE 推送机制**: 实现 `/api/stream/{task_id}` 接口。**【配套测试】(SSE Overload)** 使用压测工具 (如 `locust` / `wrk`) 模拟持有数千条闲置空连接，验证数据库轮询模式下能否保持极低 CPU 开销。
 
