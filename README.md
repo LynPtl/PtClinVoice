@@ -60,10 +60,18 @@ pytest -v
 - **本地患者隐私验证 (`test_privacy_filter.py`)**：处理本地的 PII (社保号，姓名)，执行打码 `[REDACTED]`。
 - **集成与端到端 (`test_integration.py`)**: 跑通全链路 (Audio -> WHISPER -> PRESIDIO -> MOCKED DEEPSEEK)。
 
-**B. 真实 DeepSeek 云端实盘测试 (验证您的 Key 是否可用)**:
-由于上面的全盘扫描是处于 Mock (省钱) 状态，请单独执行以下脚本消费几十 Token 直连云端验证：
+**B. 真实 DeepSeek 云端实机测试 (验证您的 Key 是否可用)**:
+由于上面的全盘扫描是处于 Mock 状态，请单独执行以下脚本连接云端验证。
+
+1. **单维文本结构验证**:
 ```bash
 python3 test_real_deepseek_api.py
+```
+
+2. **核心业务：全链路语音端到端转写 (Audio -> SOAP)**:
+抛弃 Mock，直灌真实 MP3 音频，体验完整的本地识别 + 本地隐私拦截 + 云端语义角色重组。
+```bash
+python3 run_live_e2e_diarization.py
 ```
 
 ### 扩展阅读

@@ -85,14 +85,13 @@
 
 ## 4. 实机云环境验证 (Live Cloud Environment Validation)
 
-**测试模块**: `test_real_deepseek_api.py` (独立验证方案，非 Pytest Mock 控制)
-脱离安全 Mock 壳，用真金白银实弹测试部署者的真实大模型配额能够在复杂的互联网中执行医疗重构。
+### 4.1 单维文本联调 (`test_real_deepseek_api.py`)
+独立验证方案（非 Pytest Mock），测试云端大模型配额能够在互联网中执行医疗重构。
 
 *   **执行方式**：手工执行带参 `python3 test_real_deepseek_api.py`。
 *   **执行与验证记录**:
-    *   成功识别到环境变量 `.env` 下属的 `DEEPSEEK_API_KEY`。
-    *   成功跨越本地沙盒网关，并借由 https 与 `api.deepseek.com` 执行握手与 SSL 发包。单次扣除不足 50 Tokens。
-    *   捕获到了未经幻觉污染的优质回包：
+    *   成功跨越本地沙盒网关，与 `api.deepseek.com` 执行握手与 SSL 发包。
+    *   捕获到了结构化回包：
         ```json
         {
           "dialogue": "[Doctor]: How are you...\n[Patient]: I've had a headache for 3 days...",
@@ -103,6 +102,16 @@
           }
         }
         ```
+*   **结果**: **[PASS]**
+
+### 4.2 全链路端到端语音听写验证 (`run_live_e2e_diarization.py`)
+这是最贴合真实商业场景的验证，抛弃了一切 Mock 数据。
+
+*   **链路流程**: 真实 MP3 音频载入 ➡️ 本地 Faster Whisper 提取文本 ➡️ 本地 Presidio 拦截身份证/姓名 ➡️ 真实投递给 DeepSeek API ➡️ 云端基于上下文执行语义角色分离与 SOAP 构建。
+*   **执行与验证记录**:
+    *   **本地引擎**：耗时不到 3 秒完成了带噪音口音的病例文本解析，并成功在本地过滤了 `Robert Oppenheimer`（名字）和敏感数字。
+    *   **角色分离机制**：Whisper 仅输出了纯文本，DeepSeek 准确地将纯文本重组为 `[Doctor]: The patient is a 45-year-old male...` 和 `[Patient]: Oh by the way, my name is [REDACTED]`。
+    *   **终端耗时**：全链路执行完毕仅消耗 `~9.5s`。
 *   **结果**: **[PASS]**
 
 ---
