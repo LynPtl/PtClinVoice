@@ -23,9 +23,12 @@ class TranscriptionTask(SQLModel, table=True):
     soap_note: Optional[str] = None
     error_message: Optional[str] = None
 
+import os
+
 # SRE Note: For a local appliance storing PII, we use a local SQLite file.
 # The critical SRE aspect here is the WAL (Write-Ahead Logging) mode.
-sqlite_file_name = "ptclinvoice_sre.db"
+# Read from DB_PATH env variable for Docker volume mapping, default to local directory.
+sqlite_file_name = os.getenv("DB_PATH", "ptclinvoice_sre.db")
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 # By default, SQLite blocks concurrent writes. We must configure timeout and WAL

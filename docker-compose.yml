@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  ptclinvoice-api:
+    image: ghcr.io/lynptl/ptclinvoice:latest
+    container_name: ptclinvoice-api
+    restart: always # Automatically restart on crash or server reboot
+    ports:
+      - "8000:8000"
+    environment:
+      # SRE Note: The .env file on the host machine will automatically be parsed
+      # and the DEEPSEEK_API_KEY will be pushed here.
+      - DB_PATH=/app/data/ptclinvoice_sre.db
+      - TZ=UTC # Standardize container timezone
+    env_file:
+      - .env
+    volumes:
+      # CRITICAL SRE DEFENSE:
+      # We map the entire /data directory, not just the single .db file.
+      # This ensures the SQLite .db-wal and .db-shm lock files are preserved,
+      # preventing "database disk image is malformed" corruption during restarts.
+      - ./data:/app/data

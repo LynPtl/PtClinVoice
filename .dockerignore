@@ -1,0 +1,21 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.env
+.idea/
+.vscode/
+
+# Ignore local datasets, notes, and db data
+tests/fixtures/
+*.db
+*.db-shm
+*.db-wal
+data/
+logs/
