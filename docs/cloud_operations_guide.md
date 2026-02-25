@@ -45,10 +45,17 @@ python3 test_real_deepseek_api.py
    - 导航至：`Compute` -> `Instances` -> `Create Instance`。
    - **Image (镜像)**: 选择 `Canonical Ubuntu 22.04/24.04 (aarch64)`。
    - **Shape (规格)**: 选择 `Ampere (ARM)` 架构下的 `VM.Standard.A1.Flex`。
-   - **配置拉满 (关键)**: 在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，满足我们的多路 STT 引擎计算需求)。
-3. **网络安全组与域名解析 (Nginx 铺垫)**：
-   - 在 Oracle VCN 中，开放 Ingress 端口 `80` (HTTP) 和 `443` (HTTPS)。
-   - (可选) 去您的域名注册商处，将子域名的 `A` 记录指向刚分配的服务器公网 IP。
+   - **配置拉满 (关键)**: 由于这是 Flex (弹性) 实例，默认显示可能只有 1 OCPU 和 6GB 内存。请手动拖拽进度条：在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，满足我们的多路 STT 引擎计算需求)。
+     - ⚠️ **SRE 避坑预警 (Out of Capacity)**: 如果您在点击创建时遇到 `Out of capacity for shape VM.Standard.A1.Flex` 的错误，这是 Oracle 免费宿主机池常见现象（通常是因为您所在的机房/区域当前没有空闲的 ARM 物理机资源）。**解决方法**：尝试更换 Availability Domain（如果您的区域有多个可用区），或者等待几天后避开高峰期重试。在此期间，我们的所有代码均支持在本地或任何 x86 服务器上进行开发与测试。
+3. **网络连通性编排 (Networking & Security)**：
+   默认情况下，Oracle 的实例即使绑定了公网 IP 也是处于“失联”状态的。必须执行以下链路打通：
+   - **创建 VCN (虚拟云网络)**: 导航至 Networking -> Virtual Cloud Networks。新建 VCN (如 `10.0.0.0/24`) 与 Public Subnet。**无需分配 IPv6**。
+   - **配置互联网网关 (Internet Gateway)**: 在 VCN 详情页左侧点击 Internet Gateways，新建一个网关并命名。
+   - **更新路由表 (Route Table)**: 点击 VCN 左侧的 Route Tables，进入 `Default Route Table`，添加规则：Target Type 选 `Internet Gateway`，Destination CIDR 填 `0.0.0.0/0`，Target 选刚才建好的网关。（这一步让服务器的公网流量能找到出口）。
+   - **放行安全列表 (Security List)**: 点击 VCN 左侧的 Security Lists，进入 `Default Security List`。默认已放行 SSH (端口 `22`)。为了后续 API 访问，请**务必添加 Ingress (入站) 规则**：Source CIDR `0.0.0.0/0`，IP Protocol `TCP`，Destination Port Range 填 `80,443,8000` (8000为后续 FastAPI 端口)。
+4. **绑定密钥与实例开通**:
+   - 在创建实例页面的网络层，选择刚才配置好的 VCN 和 Public Subnet。
+   - **关键环节**: 在 `Add SSH keys` 处选择 `Save private key`，一定要下载 `.key` 文件，这是唯一登录凭证。点击创建。
 4. **服务器出厂预装**：使用 SSH 登录这台新机器，仅需安装基础环境：
    ```bash
    sudo apt update && sudo apt install -y docker.io docker-compose git ffmpeg
