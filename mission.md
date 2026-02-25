@@ -56,21 +56,21 @@
 
 ### Phase 1: 核心 AI 引擎原型验证 (Core AI Pipeline - Script level)
 *   **目标**: 脱离复杂的 Web 框架，通过纯 Python 脚本跑通“录音进，笔记出”的黑盒流程，验证核心技术可行性。
-*   [ ] **1.1 Whisper 脚本测试**: 编写脚本，加载 `faster-whisper` (`base.en` 或 `small.en`) 对本地音频进行转写。
-*   [ ] **1.2 DeepSeek Adapter**: 编写针对 DeepSeek API 的请求代码。设计 Prompt 模板测试基于语义的角色分离与 SOAP 生成。
-*   [ ] **1.3 Privacy Filter (本地 NER)**: 编写基础函数引入 `presidio-analyzer`，验证针对英文/中文对话的本地脱敏逻辑是否精准。
+*   [ ] **1.1 Whisper 脚本测试**: 编写脚本加载 `faster-whisper` (`base.en` 或 `small.en`)。**【配套测试】** 输入标准和非标准口音的音频文件，Assert 识别文字是否合规生成。
+*   [ ] **1.2 DeepSeek Adapter**: 编写针对 DeepSeek API 的请求代码。设计 Prompt 模板测试基于语义的角色分离与 SOAP 生成。**【配套测试】** 提供模拟的逐字稿文本，验证返回的 JSON / Markdown 解析出 SOAP 格式的稳定性。
+*   [ ] **1.3 Privacy Filter (本地 NER)**: 编写基础函数引入 `presidio-analyzer`，验证针对英文/中文对话的本地脱敏逻辑是否精准。**【配套测试】** 输入包含 PII 假名组合的文本，断言被准确标记为 `[REDACTED]`。
 
 ### Phase 2: 基础设施、后端骨架与 CI/CD (Infrastructure & DevOps)
 *   **目标**: 建立工程化的 API 服务，部署基础架构监控，并打通持续集成流水线。
 *   [ ] **2.1 Docker & CI/CD**: 编写 `Dockerfile` (`python:3.10-slim` + `ffmpeg`)。在 GitHub Actions 中配置 Pipeline，实现代码提交后自动执行单元测试并打 tag。
-*   [ ] **2.2 API 骨架与数据库**: 引入 FastAPI 与 SQLite/SQLModel。定义可靠的枚举化 `Status` 并**必须为 SQLite 开启 WAL (Write-Ahead Logging) 和 Timeout**。实现定期清理过期录音的后台守护任务。
-*   [ ] **2.3 容灾级任务 Worker**: 编写一个独立运行的 `worker.py`，死循环轮询数据库挂起任务。**核心**：使用 `multiprocessing` 或 `subprocess` 为每个 Whisper 任务孵化独立子进程，确保主循环对 OOM 免疫。
-*   [ ] **2.4 极简 SSE 推送机制**: 实现 `/api/stream/{task_id}` 接口，利用轻量级的 `asyncio.sleep(1)` 结合轮询 SQLite 实时上报状态。
+*   [ ] **2.2 API 骨架与 DB WAL**: 引入 FastAPI 与 SQLite/SQLModel。定义可靠的状态机并**开启 WAL 模式**。**【配套测试】(Concurrent WAL Test)** 编写并发脚本 (e.g. `pytest-asyncio` 等) 模拟 100+ 请求瞬时并发写入/更新，断言不死锁雪崩。
+*   [ ] **2.3 容灾级任务 Worker**: 编写独立 `worker.py`，使用 `multiprocessing` 孵化子进程以免 OOM 波及主进程。**【配套测试】(OOM Survival)** 发起恶意的内存耗尽 Mock 任务，验证子进程被 Kernel 猎杀后主进程仍然健康。
+*   [ ] **2.4 极简 SSE 推送机制**: 实现 `/api/stream/{task_id}` 接口。**【配套测试】(SSE Overload)** 使用压测工具 (如 `locust` / `wrk`) 模拟持有数千条闲置空连接，验证数据库轮询模式下能否保持极低 CPU 开销。
 
 ### Phase 3: 安全机制与上传接口 (Security & Upload)
 *   **目标**: 完善数据输入通道与权限管理。
-*   [ ] **3.1 Auth Module**: 实现 JWT 鉴权体系 (`/api/auth/login`)，确保数据私密性。
-*   [ ] **3.2 File Upload**: 实现音频文件的安全接收与落盘校验（`/api/upload`）。
+*   [ ] **3.1 Auth Module**: 实现 JWT 鉴权体系 (`/api/auth/login`)，确保数据私密性。**【配套测试】** 验证无效 Token 访问核心接口的一致性 401/403 拦截。
+*   [ ] **3.2 File Upload & Burn-After-Reading**: 实现音频文件的安全接收与落盘校验（`/api/upload`），以及超时的定期清理任务。**【配套测试】(数据销毁断言)** 通过代码跑通一次正常/异常处理，最后 assert 文件系统磁盘相应路径已被彻底移除 `os.path.exists() == False`。
 
 ### Phase 4: 前端开发 (Frontend Construction)
 *   **目标**: 构建可视化的交互界面。
@@ -87,3 +87,9 @@
 *   [ ] **5.2 HTTPS**: 在 Oracle 服务器上运行 Certbot，配置 SSL 证书（医疗数据传输必须加密）。
 *   [ ] **5.3 Optimization**: 调整 Whisper 模型大小（从 `base` 升级到 `small` 或 `medium`），寻求内存和准确率的最佳平衡。
 *   [ ] **5.4 Evaluation**: 编写评估脚本，基于测试录音集计算 WER (词错率)，并统计数据库中的端到端处理延迟 (Latency)，生成最终评估报告。
+
+### Phase 6: 端到端综合防御与压力测试 (E2E Defense & Stress Testing)
+*   **目标**: 虽然各阶段已有单元测试，但上线前必须在类生产环境（Docker 容器内）进行系统级验收，确保整体堡垒架构坚不可摧。
+*   [ ] **6.1 System E2E Stress Test (多并发大考)**: 编写集成脚本，同时模拟 50 位医生兵分多路上传大体积音频文件，验证 Nginx 反代、FastAPI 接收、及 SQLite WAL 在极限 IOPS 下的**全局吞吐不崩溃**且不丢失一个请求状态。
+*   [ ] **6.2 Global OOM & Recovery Drill (全局容灾演练)**: 故意在生产 Docker 镜像中配置过小的内存硬限制 (Cgroups limited)。提交多个极限长度音频，诱导内核触发大规模 OOM 斩首行动。系统在遭遇极端屠宰后，验证 `web-server` 容器是否受波及，且崩溃的任务能否稳定显示为 `FAILED` 或被安全重试。
+*   [ ] **6.3 Final Compliance Audit Test (最终合规性地毯式搜索)**: 跑完所有压测和极端演练后，写一个全局探测脚本，针对服务器的整个文件系统进行“地毯式全盘扫描”，强断言 `.wav` / `.mp3` 生物特征文件存留数量**必须严格等于 0**。
