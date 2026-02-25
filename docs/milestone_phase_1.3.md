@@ -1,6 +1,6 @@
 # PtClinVoice 开发日志 - 里程碑 (Milestone)
 
-## 阶段：Phase 1.3 - Privacy Filter (本地端 NER 脱敏防线)
+## 阶段：Phase 1.3 - Privacy Filter (本地端 NER 脱敏)
 **日期**: 2026-02-25
 
 ### 成就与指标 (Achievements)
@@ -18,4 +18,4 @@
 - [x] 1.2 DeepSeek (重组)
 - [x] 1.3 Presidio (掩码)
 
-原型的核心黑盒引擎全部点亮起飞。等待上级会议批准后，我们可以进军 **Phase 2: 基础设施、后端骨架与 CI/CD**，开始将这些裸跑的 Python 文本包装成可多流并发、带数据库存储的异步 API 服务！
+原型的核心数据处理引擎全部验证完成。等待上级会议批准后，我们可以进军 **Phase 2: 基础设施、后端骨架与 CI/CD**，开始将这些模块包装成可多并发、带数据库存储的异步 API 服务！

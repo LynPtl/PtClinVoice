@@ -1,14 +1,14 @@
-# PtClinVoice 终极测试与质量评估报告 (QA & Testing Report)
+# PtClinVoice 测试与质量评估报告 (QA & Testing Report)
 
-**报告标题**: Phase 1 核心 AI 引擎 (脚本层) 黑盒原型测试报告
+**报告标题**: Phase 1 核心 AI 引擎原型测试报告
 **日期**: 2026-02-25
 **测试框架**: Pytest 9.0.2
 
-本文档是对 Phase 1（核心 AI 原型）开发的最终测试策略、用例设计及其集成运行结果的单点真实性依据（SSOT）。它替代了此前零散的策略文档，提供了大一统的端到端（E2E）质量断言报告，专供研发与 SRE 人员参阅。
+本文档是对 Phase 1（核心 AI 原型）开发的测试策略、用例设计及其集成运行结果的总结，提供了端到端（E2E）质量断言报告，专供研发与 SRE 人员参阅。
 
 ## 1. 测试体系概览 (Testing Framework Overview)
 
-在第一阶段，我们的核心流是无需图形界面的纯数据黑盒流转。整个测试管线使用 **Pytest** 驱动，主要涉及三大模块。
+在第一阶段，我们的核心流是无需图形界面的纯数据流转。整个测试管线使用 **Pytest** 驱动，主要涉及三大模块。
 
 我们严格遵循 **SRE 防御性断言规范**：所有的外部 API 调用一律使用 `unittest.mock` 进行“财务级物理隔离（零扣费测试）”，对于内核级的 OOM 奔溃则通过进程发送 `SIGKILL` 进行深水炸弹试探。
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 2. 单元测试防线明细 (Unit Tests)
+## 2. 单元测试明细 (Unit Tests)
 
 ### 2.1 STT 模型听写引擎 (`test_stt_core.py`)
 主要负责验证 `Faster-Whisper` 能否抗住系统物理封杀，并在不抛出 GPU 缺失错误的情况下成功跑回病理文本。
@@ -37,7 +37,7 @@
     *   **结果**: **[PASS]**
 
 ### 2.2 本地医疗隐私滤网 (`test_privacy_filter.py`)
-防线旨在验证基于 `Microsoft Presidio` 引擎和小巧的 `en_core_web_sm` (SpaCy) 模型，能否在拔断网线的条件下准确屏蔽病历特征。
+本模块旨在验证基于 `Microsoft Presidio` 引擎和小巧的 `en_core_web_sm` (SpaCy) 模型，能否在拔断网线的条件下准确屏蔽病历特征。
 
 *   **用例 C: 绝对人名销毁 (`test_privacy_filter_person_redaction`)**
     *   **测试桩**: 构造富含上下文的英文复合病句: "Hello, my name is Emily Chen and my doctor is Dr. James Wilson."
@@ -69,23 +69,23 @@
 
 ---
 
-## 3. 终极集成断言 (Phase 1 E2E Integration)
+## 3. 集成测试阶段 (Phase 1 E2E Integration)
 
 **测试模块**: `test_integration.py` (`test_phase_1_end_to_end_pipeline`)
-此为验证三个小引擎手拉手协同工作不发生数据丢失、内存互顶的终极考验。
+此模块用于验证 STT、隐私过滤与 LLM 三大组件协同工作时的数据流动完整性。
 
 *   **链路流程**: **音频注入** ➡️ Faster Whisper **生成明文** ➡️ 强行 **注水 PII (假名与证件)** ➡️ Presidio **实施物理打码** ➡️ MOCK 版 DeepSeek **大模型提取 SOAP**。
-*   **黑盒联合断言**:
+*   **集成步骤断言**:
     1. 前方 Whispser 捕获了病历的 `abdominal pain`。
-    2. 中途注入的高危密码 `Robert Oppenheimer`（名字）和 `999-88-7777` 在途经中段后被秒杀剔除。
+    2. 中途注入的高危特征 `Robert Oppenheimer`（名字）和 `999-88-7777` 在途经中段后被有效剔除。
     3. 后段输出的字典树里的最终 `subjective` 对象，必须完好保留原始的 `[REDACTED]` 特征，并且继承了最早一期的 `abdominal pain` 症状记录。
 *   **结果**: **[PASS]**
 
 ---
 
-## 4. 实盘联调防线 (Live Cloud Environment Validation)
+## 4. 实机云环境验证 (Live Cloud Environment Validation)
 
-**测试模块**: `test_real_deepseek_api.py` (独立防线，非 Pytest Mock 控制)
+**测试模块**: `test_real_deepseek_api.py` (独立验证方案，非 Pytest Mock 控制)
 脱离安全 Mock 壳，用真金白银实弹测试部署者的真实大模型配额能够在复杂的互联网中执行医疗重构。
 
 *   **执行方式**：手工执行带参 `python3 test_real_deepseek_api.py`。
@@ -109,4 +109,4 @@
 
 ## 5. 结论评测 (Closing Assessment)
 
-基于超过大量医疗文字流的独立节点与端对端串联测试验证，**PtClinVoice Phase 1 - 基础 AI 算力与过滤引擎池** 架构代码完全合规，不仅能防御并吞吐内核级的 OOM GPU显存崩溃连带击杀，同时亦挂载了严密的出海级别医疗防线，所有组件 100% Ready。此时可完全升等投入异步多并发 (Phase 2 API 层) 的研发轨道部署。
+基于医疗文字流的独立节点与端对端串联测试验证，**PtClinVoice Phase 1 - 基础 AI 算力与过滤引擎池** 架构代码符合要求，不仅能处理内核级的 OOM GPU显存崩溃隔离，同时满足基本的实体消隐脱敏需求，所有组件验证通过。此时可转入异步多并发 (Phase 2 API 层) 的研发轨道部署。

@@ -45,7 +45,7 @@ python3 test_real_deepseek_api.py
    - 导航至：`Compute` -> `Instances` -> `Create Instance`。
    - **Image (镜像)**: 选择 `Canonical Ubuntu 22.04/24.04 (aarch64)`。
    - **Shape (规格)**: 选择 `Ampere (ARM)` 架构下的 `VM.Standard.A1.Flex`。
-   - **配置拉满 (关键)**: 在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，完美契合我们的多路 STT 引擎)。
+   - **配置拉满 (关键)**: 在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，满足我们的多路 STT 引擎计算需求)。
 3. **网络安全组与域名解析 (Nginx 铺垫)**：
    - 在 Oracle VCN 中，开放 Ingress 端口 `80` (HTTP) 和 `443` (HTTPS)。
    - (可选) 去您的域名注册商处，将子域名的 `A` 记录指向刚分配的服务器公网 IP。

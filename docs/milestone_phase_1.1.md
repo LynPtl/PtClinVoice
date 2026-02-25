@@ -6,7 +6,7 @@
 ### 成就与指标 (Achievements)
 - **STT 核心隔离**：成功使用 Faster-Whisper 实现了独立的多进程 STT 引擎 (`stt_core.py`)。
 - **动态算力适配**：在模型加载时强制应用了 `device="auto"` 策略。
-- **极端容灾测试**：在 `test_stt_core.py` 中深度注入并模拟了严重的 OOM (Out Of Memory) 内存截断（内核级 `SIGKILL`），验证了主进程的绝对存活，实现了完美的内存墙隔离。
+- **极端容灾测试**：在 `test_stt_core.py` 中深度注入并模拟了严重的 OOM (Out Of Memory) 内存截断（内核级 `SIGKILL`），验证了主进程的绝对存活，实现了有效的进程隔离。
 - **RTX 4060 惊艳发力**：在宿主机的 RTX 4060 满血 CUDA 13.0 支持下，经过原生 GPU API 调用，测得最高 17 倍加速比 **(RTF=0.05x)** 的碾压级吞吐量。
 
 ### SRE 与底层架构决策 (SRE & Architecture Decisions)

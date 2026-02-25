@@ -67,4 +67,4 @@ python3 test_real_deepseek_api.py
 ```
 
 ### 扩展阅读
-所有关于底层内存防泄露拦截、环境集成、以及质量保障策略评定，请完整参阅我们的 [端到端质量评估大一统测试报告 (QA Testing Report)](docs/qa_testing_report_phase_1.md)，以及相应的云端运维部署手册。
+所有关于底层内存防泄露拦截、环境集成、以及质量保障策略评定，请完整参阅我们的 [端到端质量评估测试报告 (QA Testing Report)](docs/qa_testing_report_phase_1.md)，以及相应的云端运维部署手册。
