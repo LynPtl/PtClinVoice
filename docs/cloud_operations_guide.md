@@ -56,10 +56,23 @@ python3 test_real_deepseek_api.py
 4. **绑定密钥与实例开通**:
    - 在创建实例页面的网络层，选择刚才配置好的 VCN 和 Public Subnet。
    - **关键环节**: 在 `Add SSH keys` 处选择 `Save private key`，一定要下载 `.key` 文件，这是唯一登录凭证。点击创建。
-4. **服务器出厂预装**：使用 SSH 登录这台新机器，仅需安装基础环境：
-   ```bash
-   sudo apt update && sudo apt install -y docker.io docker-compose git ffmpeg
-   ```
+4. **服务器出厂预装与 OS 防火墙放行**：使用 SSH 登录这台新机器。
+   
+    **非常重要 (Oracle 独有巨坑)**：除了网页端的 Security List 之外，Oracle 的 Ubuntu 镜像默认在操作系统级别通过 `iptables` 锁死了除 22 以外的所有入站端口。您必须先执行内核级的端口放行：
+    ```bash
+    # 放行 8000 (FastAPI), 80 (HTTP), 443 (HTTPS) 端口
+    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
+    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+    
+    # 保存 iptables 规则使其重启失效前持久化
+    sudo netfilter-persistent save
+    ```
+    
+    然后安装我们的基础环境：
+    ```bash
+    sudo apt update && sudo apt install -y docker.io docker-compose git ffmpeg
+    ```
 至此，最底层的免费云宿主机就搭好了，后续将配合 GitHub Actions 和多架构 Docker 无缝承接构建流。
 
 ### 2.2 Docker 容器云编排测试 (Phase 2.3+)
@@ -67,9 +80,21 @@ python3 test_real_deepseek_api.py
 
 为了遵守我们定下的“极简与不可变基础设施”底线，您在云端实例上**完全不需要拉取整个 Git 仓库的代码**。请通过 SSH 登入您的 Oracle Cloud 实例，依次执行：
 
-#### 第一步：云端装配容器引擎 (如果未经开通)
+#### 第一步：打通双层防火墙与装配容器引擎 (如果未经开通)
+**1. 放行 Oracle OS 级防火墙 (关键巨坑)**
+很多时候在网页端 (Security List) 开放了 8000 端口，但请求仍旧无响应，是因为 Oracle 的 Ubuntu 模板自带严苛的本地 `iptables` 规则。请强行打通操作系统层的拦截：
 ```bash
-# 刷新包记录并装配 Docker
+# 在 Linux 防火墙链条首部强势插入 8000, 80, 443 端口的放行许可
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+
+# 固化防火墙免得服务器重启后规则消失
+sudo netfilter-persistent save
+```
+
+**2. 刷新包记录并装配 Docker**
+```bash
 sudo apt update && sudo apt install -y docker.io docker-compose
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
