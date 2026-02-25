@@ -68,4 +68,14 @@ def process_audio_task(task_id: str, audio_path: str):
                 task.error_message = error_info
                 session.add(task)
                 session.commit()
+    
+    finally:
+        # --------- BURN AFTER READING DEFENSE ---------
+        # SRE Security: Regardless of whether the pipeline succeeded, crashed, or OOM'd,
+        # we MUST purge the physical audio file from the server disk to protect PII.
+        if os.path.exists(audio_path) and not "mock" in audio_path and not "tests/" in audio_path:
+            try:
+                os.remove(audio_path)
+            except Exception as cleanup_err:
+                print(f"CRITICAL: Failed to shred audio file {audio_path}: {cleanup_err}")
 

@@ -12,6 +12,11 @@ class TaskStatus(str, Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    hashed_password: str
+
 class TranscriptionTask(SQLModel, table=True):
     id: str = Field(primary_key=True, index=True)
     status: TaskStatus = Field(default=TaskStatus.PENDING)
@@ -22,6 +27,9 @@ class TranscriptionTask(SQLModel, table=True):
     transcript: Optional[str] = None
     soap_note: Optional[str] = None
     error_message: Optional[str] = None
+    
+    # Phase 3 Security: Zero-Trust mapping
+    owner_id: int = Field(foreign_key="user.id", index=True)
 
 import os
 
