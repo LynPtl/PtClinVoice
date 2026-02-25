@@ -54,5 +54,15 @@
 
 ---
 
-## 4. 结论 (Conclusion)
-**Phase 1 原型验证系统达到生产级健壮性标准**。架构内存在极强的 OOM 隔离与隐私截断盾牌。该组件集合目前已准备就绪，可以并入 Phase 2 的多流协程基础设施。
+## 4. 实盘联调测试 (Live API Verification)
+
+**测试模块**: `test_real_deepseek_api.py`
+- **验证目标**: 脱离 Mock 环境，验证真实的 `DEEPSEEK_API_KEY` 是否能够打通 `api.deepseek.com` 的物理链路并符合格式预期。
+- **手动测试结果**: **[PASS]**
+  - **网络层**: 成功通过 `python-dotenv` 加载本地 `.env`，完成握手与鉴权。
+  - **推理层**: 发送 30 Tokens 的微型对话短文，模型稳定返回了带有 `subjective`，`objective`，`assessment`，`plan` 的 Strict-JSON 报文。证明了 `DeepSeekClinicalAdapter` 具备完整的生产环境请求能力。
+
+---
+
+## 5. 结论 (Conclusion)
+**Phase 1 原型验证系统达到生产级健壮性标准**。架构内存在极强的 OOM 隔离与隐私截断盾牌，且已完美连通云端认知引擎。该组件集合目前已准备就绪，可以并入 Phase 2 的多流协程基础设施。
