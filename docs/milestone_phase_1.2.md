@@ -11,6 +11,9 @@
 ### SRE 与底层架构决策 (SRE & Architecture Decisions)
 - **非确定性收敛**：强制固定 `temperature=0.1`，由于临床病历极其严肃，我们在此压制了大模型的发散创造性幻觉，保证提取出的症状与既往史严格忠实于转录文本。
 - **云原生密钥防御**：引入 `python-dotenv` 隔离云端密钥，确保在代码库中不出现任何明文 API 密钥暴露的风险。
+- **降本增效核心：大模型语义发声员分离 (Semantic Speaker Diarization)**：
+  - **问题**：传统在本地 STT (如 Pyannote) 中做声纹分离极其消耗内存，且在无 GPU 的边缘云上很容易跑满 CPU 导致 OOM。
+  - **解决方案 (见 `deepseek_adapter.py`)**：我们将 Faster-Whisper 设置为“纯听写模式”（只输出不分人的文字流水账）。随后把脱敏文字发送给 DeepSeek，利用 LLM 强大的逻辑推理能力，通过 System Prompt 强制要求其根据上下文重新排版出 `[Doctor]: ... \n [Patient]: ...` 的对话流。这在保障极高分离准度的同时，彻底解放了本地算力。
 
 ### 遗留问题与下一步 (Next Steps)
 本阶段大模型桥接与结构重组已测试完毕，JSON 返回稳定无 Markdown 污染。
