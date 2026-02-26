@@ -24,13 +24,13 @@
    DEEPSEEK_API_KEY=your_key_here
    JWT_SECRET_KEY=dev_local_secret
    ```
-4. **拉起 FastAPI 网关**:
+4. **启动 FastAPI 网关**:
    ```bash
    PYTHONPATH=. uvicorn app.main:app --reload --port 8000
    ```
-   *服务将在 `http://localhost:8000/docs` 上线。*
+   *服务端点将在 `http://localhost:8000/docs` 对外暴露。*
 
-## 3. 前端交互控制台拉起 (Frontend Web UI)
+## 3. 前端交互控制台 (Frontend Web UI)
 
 新开一个终端窗口：
 

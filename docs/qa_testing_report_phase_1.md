@@ -74,7 +74,7 @@
 **测试模块**: `test_integration.py` (`test_phase_1_end_to_end_pipeline`)
 此模块用于验证 STT、隐私过滤与 LLM 三大组件协同工作时的数据流动完整性。
 
-*   **链路流程**: **音频注入** ➡️ Faster Whisper **生成明文** ➡️ 强行 **注水 PII (假名与证件)** ➡️ Presidio **实施物理打码** ➡️ MOCK 版 DeepSeek **大模型提取 SOAP**。
+*   **链路流程**: **音频注入** -> Faster Whisper **生成明文** -> 强行 **注水 PII (假名与证件)** -> Presidio **实施物理打码** -> MOCK 版 DeepSeek **大模型提取 SOAP**。
 *   **集成步骤验证**:
     1. 前方 Whispser 捕获了病历的 `abdominal pain`。
     2. 中途注入的高危特征 `Robert Oppenheimer`（名字）和 `999-88-7777` 在途经中段后被有效剔除。
@@ -107,7 +107,7 @@
 ### 4.2 全链路端到端语音听写验证 (`run_live_e2e_diarization.py`)
 这是最贴合真实商业场景的验证，抛弃了一切 Mock 数据。
 
-*   **链路流程**: 真实 MP3 音频载入 ➡️ 本地 Faster Whisper 提取文本 ➡️ 本地 Presidio 拦截身份证/姓名 ➡️ 真实投递给 DeepSeek API ➡️ 云端基于上下文执行语义角色分离与 SOAP 构建。
+*   **链路流程**: 真实 MP3 音频载入 -> 本地 Faster Whisper 提取文本 -> 本地 Presidio 拦截身份证/姓名 -> 真实投递给 DeepSeek API -> 云端基于上下文执行语义角色分离与 SOAP 构建。
 *   **执行与验证记录**:
     *   **本地引擎**：耗时不到 3 秒完成了带噪音口音的病例文本解析，并成功在本地过滤了 `Robert Oppenheimer`（名字）和敏感数字。
     *   **角色分离机制**：Whisper 仅输出了纯文本，DeepSeek 准确地将纯文本重组为 `[Doctor]: The patient is a 45-year-old male...` 和 `[Patient]: Oh by the way, my name is [REDACTED]`。

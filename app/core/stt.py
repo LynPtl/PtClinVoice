@@ -19,7 +19,8 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
             segments, info = model.transcribe(
                 audio_path, 
                 beam_size=5,
-                initial_prompt=initial_prompt
+                initial_prompt=initial_prompt,
+                language="en"
             )
             # Exhaust generator
             text = " ".join([seg.text.strip() for seg in segments]).strip()
@@ -31,7 +32,8 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
                 segments, info = model.transcribe(
                     audio_path, 
                     beam_size=5,
-                    initial_prompt=initial_prompt
+                    initial_prompt=initial_prompt,
+                    language="en"
                 )
                 text = " ".join([seg.text.strip() for seg in segments]).strip()
             else:
@@ -39,8 +41,9 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
         
         child_conn.send({"status": "success", "text": text})
     except Exception as e:
+        import traceback
         # Catch normal Python exceptions and return them gracefully
-        child_conn.send({"status": "error", "error": str(e)})
+        child_conn.send({"status": "error", "error": traceback.format_exc()})
     finally:
         child_conn.close()
 

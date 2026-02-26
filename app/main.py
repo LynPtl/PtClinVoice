@@ -145,7 +145,8 @@ def create_mock_transcription(
         new_task = TranscriptionTask(
             id=task_id, 
             status=TaskStatus.PENDING,
-            owner_id=current_user.id  # Bind task to user
+            owner_id=current_user.id,
+            filename=os.path.basename(req.audio_path)
         )
         session.add(new_task)
         session.commit()
@@ -179,7 +180,8 @@ def upload_audio(
         new_task = TranscriptionTask(
             id=task_id, 
             status=TaskStatus.PENDING,
-            owner_id=current_user.id
+            owner_id=current_user.id,
+            filename=file.filename
         )
         session.add(new_task)
         session.commit()

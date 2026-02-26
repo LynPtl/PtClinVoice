@@ -26,7 +26,7 @@ def process_audio_task(task_id: str, audio_path: str):
     try:
         # --- LOCAL STT OOM ISOLATION ZONE ---
         # The underlying process is strictly spawned dynamically and drops everything upon crash
-        raw_transcript = run_stt_isolated(audio_path, model_size="tiny.en")
+        raw_transcript = run_stt_isolated(audio_path, model_size="tiny")
         
         # 2. Update State to ANALYZING
         with Session(engine) as session:

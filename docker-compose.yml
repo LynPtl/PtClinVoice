@@ -3,6 +3,9 @@ version: '3.8'
 services:
   ptclinvoice-api:
     image: ghcr.io/lynptl/ptclinvoice:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ptclinvoice-api
     restart: always # Automatically restart on crash or server reboot
     ports:

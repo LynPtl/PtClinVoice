@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Table, Badge, Paper, Title, ActionIcon, Group } from '@mantine/core';
 import { IconRefresh, IconEye } from '@tabler/icons-react';
 import { getTasks, type TranscriptionTask } from '../api/tasks';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger }) => {
+    const navigate = useNavigate();
+    const token = useAuthStore((state: any) => state.token);
     const [tasks, setTasks] = useState<TranscriptionTask[]>([]);
     const [loading, setLoading] = useState(true);
+    const eventSourcesRef = useRef<{ [key: string]: EventSource }>({});
 
     const fetchTasks = async () => {
         setLoading(true);
@@ -22,6 +27,46 @@ export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger 
     useEffect(() => {
         fetchTasks();
     }, [refreshTrigger]);
+
+    useEffect(() => {
+        // Cleanup all SSE connections on component unmount
+        return () => {
+            Object.values(eventSourcesRef.current).forEach((source: any) => source.close());
+            eventSourcesRef.current = {};
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!token) return;
+
+        tasks.forEach(task => {
+            if ((task.status === 'PENDING' || task.status === 'TRANSCRIBING' || task.status === 'ANALYZING') && !eventSourcesRef.current[task.id]) {
+                const source = new EventSource(`/api/stream/${task.id}?token=${token}`);
+                eventSourcesRef.current[task.id] = source;
+
+                source.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        setTasks((prevTasks) =>
+                            prevTasks.map((t) => (t.id === data.task_id ? { ...t, status: data.status } : t))
+                        );
+
+                        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+                            source.close();
+                            delete eventSourcesRef.current[task.id];
+                        }
+                    } catch (e) {
+                        console.error('SSE parsing error', e);
+                    }
+                };
+
+                source.onerror = () => {
+                    source.close();
+                    delete eventSourcesRef.current[task.id];
+                };
+            }
+        });
+    }, [tasks, token]);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -52,14 +97,19 @@ export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger 
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                    {tasks.map((task) => (
+                    {tasks.map((task: TranscriptionTask) => (
                         <Table.Tr key={task.id}>
                             <Table.Td>{task.id.slice(0, 8)}...</Table.Td>
                             <Table.Td>{task.filename || 'Unknown'}</Table.Td>
                             <Table.Td>{getStatusBadge(task.status)}</Table.Td>
                             <Table.Td>
                                 {task.status === 'COMPLETED' && (
-                                    <ActionIcon variant="light" color="blue">
+                                    <ActionIcon
+                                        variant="light"
+                                        color="blue"
+                                        onClick={() => navigate(`/task/${task.id}`)}
+                                        title="View Workspace"
+                                    >
                                         <IconEye size={16} />
                                     </ActionIcon>
                                 )}

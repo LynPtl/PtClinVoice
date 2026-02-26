@@ -4,6 +4,7 @@ from enum import Enum
 from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field, create_engine
 from sqlalchemy import event
+import os
 
 class TaskStatus(str, Enum):
     PENDING = "PENDING"
@@ -23,6 +24,9 @@ class TranscriptionTask(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
+    # Metadata
+    filename: Optional[str] = None
+    
     # Store the actual results
     transcript: Optional[str] = None
     soap_note: Optional[str] = None
@@ -30,8 +34,6 @@ class TranscriptionTask(SQLModel, table=True):
     
     # Phase 3 Security: Zero-Trust mapping
     owner_id: int = Field(foreign_key="user.id", index=True)
-
-import os
 
 # SRE Note: For a local appliance storing PII, we use a local SQLite file.
 # The critical SRE aspect here is the WAL (Write-Ahead Logging) mode.

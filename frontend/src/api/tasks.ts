@@ -2,13 +2,18 @@ import { apiClient } from './axios';
 
 export interface TranscriptionTask {
     id: string;
-    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-    filename: string;
+    status: 'PENDING' | 'TRANSCRIBING' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
+    filename?: string;
+    transcript?: string;
+    soap_note?: string;
+    error_message?: string;
     created_at: string;
 }
 
 export const getTasks = async (): Promise<TranscriptionTask[]> => {
-    const response = await apiClient.get('/tasks');
+    // SRE Note: Append timestamp to aggressively bust browser cache, ensuring we don't 
+    // load stale empty task lists when navigating back from Workspace.
+    const response = await apiClient.get(`/tasks?t=${Date.now()}`);
     return response.data;
 };
 

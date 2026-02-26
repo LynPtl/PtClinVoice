@@ -10,8 +10,15 @@ class ClinicalPrivacyFilter:
         leaving the local hardware before sending the transcript to the DeepSeek cloud.
         """
         try:
-            # We initialize with the lightweight SpaCy model en_core_web_sm
-            self.analyzer = AnalyzerEngine()
+            # SRE Note: Pinning to en_core_web_sm to prevent Presidio from attempting 
+            # to download the 400MB en_core_web_lg model at runtime.
+            from presidio_analyzer.nlp_engine import SpacyNlpEngine
+            from presidio_analyzer import AnalyzerEngine
+            
+            # Create a configuration for the SpaCy model
+            nlp_engine = SpacyNlpEngine(models=[{"lang_code": "en", "model_name": "en_core_web_sm"}])
+            
+            self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
             self.anonymizer = AnonymizerEngine()
         except OSError as e:
             raise RuntimeError(

@@ -28,13 +28,13 @@
 source .venv/bin/activate
 python3 test_real_deepseek_api.py
 ```
-如见 `✅ 深蓝测试 (DeepSeek API) 成功通过` 字样，即代表您的密钥拥有合法的余额并且能成功绕开医院防火墙到达外网大模型集群。
+如见 `[PASS] 深蓝测试 (DeepSeek API) 成功通过` 字样，即代表您的密钥拥有合法的余额并且能成功绕开医院防火墙到达外网大模型集群。
 
 ---
 
 ## 2. 后续将要集成的云端操作 (Upcoming Workloads - Phase 2+)
 
-*(以下条目将在我们推进开发时，持续更新为您提供详尽的保姆级入参和云端配置教程)*
+*(以下条目将在后续迭代中更新，提供详尽的参数配置与部署指导)*
 
 ### 2.1 Web 服务器托管与 Oracle Cloud ARM64 实例申领 (Phase 2)
 考虑到项目核心 AI 的低计算配额与极致降本需求，我们的目标生产环境为 **Oracle Cloud (甲骨文云) 的 Always Free ARM64 (Ampere A1) 实例**。
@@ -45,8 +45,8 @@ python3 test_real_deepseek_api.py
    - 导航至：`Compute` -> `Instances` -> `Create Instance`。
    - **Image (镜像)**: 选择 `Canonical Ubuntu 22.04/24.04 (aarch64)`。
    - **Shape (规格)**: 选择 `Ampere (ARM)` 架构下的 `VM.Standard.A1.Flex`。
-   - **配置拉满 (关键)**: 由于这是 Flex (弹性) 实例，默认显示可能只有 1 OCPU 和 6GB 内存。请手动拖拽进度条：在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，满足我们的多路 STT 引擎计算需求)。
-     - ⚠️ **SRE 避坑预警 (Out of Capacity)**: 如果您在点击创建时遇到 `Out of capacity for shape VM.Standard.A1.Flex` 的错误，这是 Oracle 免费宿主机池常见现象（通常是因为您所在的机房/区域当前没有空闲的 ARM 物理机资源）。**解决方法**：尝试更换 Availability Domain（如果您的区域有多个可用区），或者等待几天后避开高峰期重试。在此期间，我们的所有代码均支持在本地或任何 x86 服务器上进行开发与测试。
+   - **资源配置上限** (关键): 由于这是 Flex (弹性) 实例，默认显示可能只有 1 OCPU 和 6GB 内存。请在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，能够满足多路 STT 引控计算需求)。
+     - **[WARNING] 容量耗尽告警 (Out of Capacity)**: 若执行创建时系统提示 `Out of capacity for shape VM.Standard.A1.Flex`，此为 Oracle 免费宿主机池常见现象（通常指向所选可用区当前无空闲 ARM 物理资源）。**缓解方案**：尝试更换可用域（Availability Domain），或错峰重试。在此期间，项目代码完全兼容在本地或常规 x86 服务器上进行测试验证。
 3. **网络连通性编排 (Networking & Security)**：
    默认情况下，Oracle 的实例即使绑定了公网 IP 也是处于“失联”状态的。必须执行以下链路打通：
    - **创建 VCN (虚拟云网络)**: 导航至 Networking -> Virtual Cloud Networks。新建 VCN (如 `10.0.0.0/24`) 与 Public Subnet。**无需分配 IPv6**。
@@ -58,14 +58,14 @@ python3 test_real_deepseek_api.py
    - **关键环节**: 在 `Add SSH keys` 处选择 `Save private key`，一定要下载 `.key` 文件，这是唯一登录凭证。点击创建。
 4. **服务器出厂预装与 OS 防火墙放行**：使用 SSH 登录这台新机器。
    
-    **非常重要 (Oracle 独有巨坑)**：除了网页端的 Security List 之外，Oracle 的 Ubuntu 镜像默认在操作系统级别通过 `iptables` 锁死了除 22 以外的所有入站端口。您必须先执行内核级的端口放行：
+    **操作系统层安全组拦截机制**：除了云端控制台的 Security List，Oracle 的 Ubuntu 镜像默认在操作系统级别通过 `iptables` 限制了除端口 22 以外的所有入站请求。您必须首先执行内核级的网络端口放行：
     ```bash
     # 放行 8000 (FastAPI), 80 (HTTP), 443 (HTTPS) 端口
     sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
     sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
     sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
     
-    # 保存 iptables 规则使其重启失效前持久化
+    # 持久化 iptables 规则以防止系统重启后失效
     sudo netfilter-persistent save
     ```
     
@@ -80,16 +80,16 @@ python3 test_real_deepseek_api.py
 
 为了遵守我们定下的“极简与不可变基础设施”底线，您在云端实例上**完全不需要拉取整个 Git 仓库的代码**。请通过 SSH 登入您的 Oracle Cloud 实例，依次执行：
 
-#### 第一步：打通双层防火墙与装配容器引擎 (如果未经开通)
-**1. 放行 Oracle OS 级防火墙 (关键巨坑)**
+#### 第一步：配置网络端点与部署容器引擎 (若未经初始化)
+**1. 放行 Oracle 操作系统级防火墙**
 很多时候在网页端 (Security List) 开放了 8000 端口，但请求仍旧无响应，是因为 Oracle 的 Ubuntu 模板自带严苛的本地 `iptables` 规则。请强行打通操作系统层的拦截：
 ```bash
-# 在 Linux 防火墙链条首部强势插入 8000, 80, 443 端口的放行许可
+# 在 Linux 防火墙规则顶层添加针对 8000, 80, 443 端口的入站放行许可
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
 
-# 固化防火墙免得服务器重启后规则消失
+# 持久化防火墙规则
 sudo netfilter-persistent save
 ```
 
@@ -107,66 +107,35 @@ sudo usermod -aG docker $USER
 mkdir -p ~/ptclinvoice_deploy/data
 cd ~/ptclinvoice_deploy
 
-# >>> 【授权检查点】：这是您需要手工处理的唯一地方 <<<
+# >>> [AUTHORIZATION CHECKPOINT]: The only manual step required <<<
 # 创建隐形环境变量记录表，并贴入您的真实 DeepSeek API Key
 cat << 'EOF' > .env
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 EOF
 ```
 
-#### 第三步：一键同步 SRE 规范编排文件 (Full-Stack Orchestration)
-为了实现“前端零配置反向代理 API”与“后端极值防御环境”的无缝对接，您不需要手动使用 vim/nano 粘帖配置。
-请在云主机的 SSH 终端直接运行下方 Bash 命令，自动生成多容器 `docker-compose.yml`：
+#### 第三步：拉取仓库源码与双容器全栈编排 (Full-Stack Orchestration)
+由于依赖底包和核心算法可能会经历高频本地调优（例如：STT 语言参数修复、隐私过滤修复），为了确保您能拿到绝对最新的全量代码（不依赖尚未 Push 到云端 Registry 的镜像缓存），请使用 Git 拉取源码并在本地触发 Build：
 
 ```bash
-cat << 'EOF' > docker-compose.yml
-version: '3.8'
+# 1. 克隆托管仓库
+git clone https://github.com/lynptl/PtClinVoice.git
+cd PtClinVoice
 
-services:
-  ptclinvoice-api:
-    image: ghcr.io/lynptl/ptclinvoice:latest
-    container_name: ptclinvoice-api
-    restart: always
-    ports:
-      - "8000:8000"
-    healthcheck:
-      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    environment:
-      - DB_PATH=/app/data/ptclinvoice_sre.db
-      - TZ=UTC
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+# 2. 将您刚才生成的 .env 密钥配置文件移动到根目录
+mv ../.env ./
 
-  ptclinvoice-web:
-    image: ghcr.io/lynptl/ptclinvoice-web:latest
-    container_name: ptclinvoice-web
-    restart: always
-    ports:
-      - "80:80"
-    depends_on:
-      - ptclinvoice-api
-EOF
-```
+# 3. 强制触发本地联合构建并拉起双容器
+sudo docker-compose up -d --build
 
->**架构注记**：前端静态站通过轻量级 Nginx (挂载在宿主机端口 `80`) 进行直接分发。内置反向代理会自动将任何 `/api/*` 的请求无缝路由重定向至背后的 `ptclinvoice-api:8000` 网络空间，彻底根除生产环境 CORS 跨域问题。
-
-#### 第四步：远程拉起与前端控制台验收打卡
-```bash
-# 强制拉取后、前端的最新 GHCR 镜像，并实施后台拉起
-sudo docker-compose pull && sudo docker-compose up -d
-
-# 立刻探活后端数据链路
+# 4. 立刻探活后端数据链路
 curl http://localhost:8000/health
-# 预期秒回：{"status": "ok", "service": "PtClinVoice API"}
+# 预期正常返回：{"status": "ok", "service": "PtClinVoice API"}
 ```
 
-**✅ 视觉交互系统走查流程 (E2E Cloud Dashboard QA)**：
+>**架构注记**：`docker-compose.yml` 中的前端静态站通过轻量级 Nginx (挂载在宿主机端口 `80`) 进行分发。内置反向代理会自动将任何 `/api/*` 的请求无缝代理至背后的 `ptclinvoice-api:8000` 节点。
+
+**[PASS] 视觉交互系统走查流程 (E2E Cloud Dashboard QA)**：
 1. 打开浏览器输入 `http://<您的Oracle公网IP>` 即可直接触达部署在 Nginx 中的前端临床交互控制台。
 2. 于 `/login` 登录病区账户，此时 Axios 将把凭证精准无误地由 Nginx Reverse-Proxy 透传给后方 Python JWT 守卫引擎。
 3. 拖拽音频进入 Upload 流水线；验证 Nginx 防阻拦特性对 SSE Server-Sent Events 事件流的高速透传。
