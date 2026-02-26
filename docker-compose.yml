@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ptclinvoice-api:
     image: ghcr.io/lynptl/ptclinvoice:latest
