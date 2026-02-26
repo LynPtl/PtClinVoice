@@ -43,21 +43,29 @@ docker-compose up -d
 
 ---
 
-### 2. 开发与调试环境 (Development Environment)
-适用于核心代码的二次研发或性能评测。
+### 2. 本地联调测试与双端架构启动 (Full Stack Development)
+由于项目升级至包含现代 Web 控制台的全栈架构，请使用以下步骤进行完全拟真的系统测试。详细分离指令请参阅：[快速本地联调向导](docs/local_testing_guide.md)。
 
-**依赖初始化**
-操作系统级依赖要求：安装 `ffmpeg`。
-
+**1. 开启 FastAPI 数据核心引擎**
+在根目录启动具备 CUDA 可加速条件与持久化的后端：
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 
-# 启动符合包路径规范的开发服务器
-PYTHONPATH=. uvicorn app.main:app --reload
+# 暴露 8000 端口
+PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 ```
+
+**2. 开启 Vite / React 可视化前端工作台**
+在 `frontend/` 目录启动客户端：
+```bash
+cd frontend
+npm install
+npm run dev
+```
+前端 UI 将在 `http://localhost:5173` 就绪，并通过内置代理自动联通后端的 JWT 守卫与 SSE 推送流。此全栈模式极度适合 SRE 进行链路穿透测试及开发调试。
 
 ---
 

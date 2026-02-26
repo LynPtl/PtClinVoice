@@ -114,12 +114,14 @@ DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 EOF
 ```
 
-#### 第三步：一键同步 SRE 规范编排文件
-为了让云主机复现我们本地刚写好的 SQLite WAL 防御挂载和原生 Healthcheck 探针，您**不需要手动使用 vim/nano 新建文件去粘贴**。
+#### 第三步：一键同步 SRE 规范编排文件 (Full-Stack Orchestration)
+为了实现“前端零配置反向代理 API”与“后端极值防御环境”的无缝对接，您不需要手动使用 vim/nano 粘帖配置。
+请在云主机的 SSH 终端直接运行下方 Bash 命令，自动生成多容器 `docker-compose.yml`：
 
-请**直接将下方这整段 Bash 命令框里的内容完整复制**，然后粘贴到您的 SSH 终端按下回车。这条命令会自动利用内置工具在当前目录下生成配置无误的 `docker-compose.yml` 文件：
 ```bash
 cat << 'EOF' > docker-compose.yml
+version: '3.8'
+
 services:
   ptclinvoice-api:
     image: ghcr.io/lynptl/ptclinvoice:latest
@@ -140,22 +142,44 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+
+  ptclinvoice-web:
+    image: ghcr.io/lynptl/ptclinvoice-web:latest
+    container_name: ptclinvoice-web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - ptclinvoice-api
 EOF
 ```
 
-#### 第四步：远程拉起与验收打卡
+>**架构注记**：前端静态站通过轻量级 Nginx (挂载在宿主机端口 `80`) 进行直接分发。内置反向代理会自动将任何 `/api/*` 的请求无缝路由重定向至背后的 `ptclinvoice-api:8000` 网络空间，彻底根除生产环境 CORS 跨域问题。
+
+#### 第四步：远程拉起与前端控制台验收打卡
 ```bash
-# 一键空降指令：强制拉取我们在 Github Actions 上刚出炉的 Phase 2.3 最新包，并在后台拉起
+# 强制拉取后、前端的最新 GHCR 镜像，并实施后台拉起
 sudo docker-compose pull && sudo docker-compose up -d
 
-# 立刻探活
+# 立刻探活后端数据链路
 curl http://localhost:8000/health
 # 预期秒回：{"status": "ok", "service": "PtClinVoice API"}
-
-# (可选) 查看刚写好的 SRE 自诊断探针运行履历
-sudo docker inspect --format="{{json .State.Health}}" ptclinvoice-api
 ```
-一旦走完最后一步且 `curl` 通畅无误的返回 JSON，并在浏览器能够访问 `http://<您的Oracle公网IP>:8000/docs` 查看 Swagger UI，代表部署彻底收官！
 
-### 2.3 前端站点 CDN 加速分发 (静态资源托管)
-- **预留规划**: （Phase 4 后端联调时）指导您如何利用 Vercel, Cloudflare, 或 Nginx 将基于 React / Vite 编译出的静态病历阅览后台打包分发到全球边缘节点。
+**✅ 视觉交互系统走查流程 (E2E Cloud Dashboard QA)**：
+1. 打开浏览器输入 `http://<您的Oracle公网IP>` 即可直接触达部署在 Nginx 中的前端临床交互控制台。
+2. 于 `/login` 登录病区账户，此时 Axios 将把凭证精准无误地由 Nginx Reverse-Proxy 透传给后方 Python JWT 守卫引擎。
+3. 拖拽音频进入 Upload 流水线；验证 Nginx 防阻拦特性对 SSE Server-Sent Events 事件流的高速透传。
+
+### 2.3 手工容器化构建指南 (本地打包特供)
+若云平台拉取 GHCR 镜像受阻，或您本地执行特殊分支改构，请使用以下双层编译架构进行手工落盘：
+```bash
+# 构建后端含 ffmpeg 与 spacy 依赖的厚底包（约 800MB）
+docker build -t ghcr.io/lynptl/ptclinvoice:latest .
+
+# 构建前端含 React 编译阶段的 Nginx 代理包
+docker build -t ghcr.io/lynptl/ptclinvoice-web:latest ./frontend
+
+# 启动全栈
+docker-compose up -d
+```

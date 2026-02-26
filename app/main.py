@@ -1,14 +1,18 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordRequestForm
 import os
 import shutil
 from pydantic import BaseModel
 import uuid
+import json
+import asyncio
 from sqlmodel import Session, select
 from app.database import engine, create_db_and_tables, TranscriptionTask, TaskStatus, User
 from app.worker import process_audio_task
-from app.auth import get_password_hash, verify_password, create_access_token, get_current_user
+from app.auth import get_password_hash, verify_password, create_access_token, get_current_user, SECRET_KEY, ALGORITHM
+import jwt
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,7 +64,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         access_token = create_access_token(data={"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/tasks/{task_id}", response_model=TranscriptionTask)
+@app.get("/api/tasks/{task_id}", response_model=TranscriptionTask)
 def get_task_status(task_id: str, current_user: User = Depends(get_current_user)):
     """
     Retrieve task status. Protected by JWT.
@@ -75,6 +79,53 @@ def get_task_status(task_id: str, current_user: User = Depends(get_current_user)
             raise HTTPException(status_code=403, detail="Not authorized to access this task")
             
         return task
+
+@app.get("/api/tasks")
+def list_tasks(current_user: User = Depends(get_current_user)):
+    """
+    List all tasks owned by the current user.
+    """
+    with Session(engine) as session:
+        # Order by created_at DESC ideally, assuming default sqlite ROWID order for now
+        tasks = session.exec(select(TranscriptionTask).where(TranscriptionTask.owner_id == current_user.id)).all()
+        return tasks
+
+@app.get("/api/stream/{task_id}")
+async def stream_task_status(task_id: str, token: str = Query(...)):
+    """
+    Phase 4.4: SSE Endpoint for Real-time Task Updates.
+    Since EventSource cannot send Authorization headers, we use a query param token.
+    """
+    credentials_exception = HTTPException(status_code=401, detail="Invalid token")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if not username: raise credentials_exception
+    except Exception:
+        raise credentials_exception
+        
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if not user: raise credentials_exception
+        task = session.get(TranscriptionTask, task_id)
+        if not task or task.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Task not found or forbidden")
+
+    async def event_generator():
+        last_status = None
+        while True:
+            with Session(engine) as session:
+                task = session.get(TranscriptionTask, task_id)
+            if not task:
+                break
+            if task.status != last_status:
+                last_status = task.status
+                yield f"data: {json.dumps({'task_id': task.id, 'status': task.status})}\n\n"
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                break
+            await asyncio.sleep(1) # SSE poll interval
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 class MockTranscribeRequest(BaseModel):
     audio_path: str

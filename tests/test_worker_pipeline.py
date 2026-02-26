@@ -52,7 +52,7 @@ def setup_db():
 def test_background_worker_pipeline(mock_openai_client):
     """
     Simulates a client submitting a MockTranscribeRequest to the FastAPI background queue.
-    The client then polls the /tasks/{task_id} endpoint until the status reaches COMPLETED.
+    The client then polls the /api/tasks/{task_id} endpoint until the status reaches COMPLETED.
     """
     # Create test user
     with Session(engine) as session:
@@ -81,7 +81,7 @@ def test_background_worker_pipeline(mock_openai_client):
     final_state = None
     
     for _ in range(max_retries):
-        status_resp = client.get(f"/tasks/{task_id}", headers=headers)
+        status_resp = client.get(f"/api/tasks/{task_id}", headers=headers)
         assert status_resp.status_code == 200
         state = status_resp.json()
         

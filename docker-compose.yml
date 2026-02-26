@@ -23,6 +23,17 @@ services:
     volumes:
       # CRITICAL SRE DEFENSE:
       # We map the entire /data directory, not just the single .db file.
-      # This ensures the SQLite .db-wal and .db-shm lock files are preserved,
-      # preventing "database disk image is malformed" corruption during restarts.
+      # This ensures the SQLite .db-wal and .db-shm lock files are preserved.
       - ./data:/app/data
+
+  ptclinvoice-web:
+    image: ghcr.io/lynptl/ptclinvoice-web:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ptclinvoice-web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - ptclinvoice-api

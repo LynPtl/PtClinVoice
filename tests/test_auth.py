@@ -52,7 +52,7 @@ def test_jwt_auth_success():
     task_id = resp.json()["task_id"]
     
     # Verify owner can fetch status
-    status_resp = client.get(f"/tasks/{task_id}", headers=headers)
+    status_resp = client.get(f"/api/tasks/{task_id}", headers=headers)
     assert status_resp.status_code == 200
 
 def test_horizontal_privilege_escalation_blocked():
@@ -69,7 +69,7 @@ def test_horizontal_privilege_escalation_blocked():
     # 2. User B tries to read it
     token_b = get_token("dr_bob", "password123")
     resp_b = client.get(
-        f"/tasks/{task_id}", 
+        f"/api/tasks/{task_id}", 
         headers={"Authorization": f"Bearer {token_b}"}
     )
     

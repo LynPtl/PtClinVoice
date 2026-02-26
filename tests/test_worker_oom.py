@@ -51,7 +51,7 @@ def test_worker_oom_handling():
         # Poll
         final_state = None
         for _ in range(10):
-            status_resp = client.get(f"/tasks/{task_id}", headers=headers)
+            status_resp = client.get(f"/api/tasks/{task_id}", headers=headers)
             state = status_resp.json()
             if state["status"] in ["COMPLETED", "FAILED"]:
                 final_state = state
