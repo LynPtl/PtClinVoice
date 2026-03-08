@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Badge, Paper, Title, ActionIcon, Group } from '@mantine/core';
-import { IconRefresh, IconEye } from '@tabler/icons-react';
-import { getTasks, type TranscriptionTask } from '../api/tasks';
+import { Table, Badge, Paper, Title, ActionIcon, Group, Modal, Button, Text } from '@mantine/core';
+import { IconRefresh, IconEye, IconTrash } from '@tabler/icons-react';
+import { getTasks, deleteTask, type TranscriptionTask } from '../api/tasks';
 import { useAuthStore } from '../store/useAuthStore';
 
 export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger }) => {
@@ -10,6 +10,9 @@ export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger 
     const token = useAuthStore((state: any) => state.token);
     const [tasks, setTasks] = useState<TranscriptionTask[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [taskToDelete, setTaskToDelete] = useState<TranscriptionTask | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const eventSourcesRef = useRef<{ [key: string]: EventSource }>({});
 
     const fetchTasks = async () => {
@@ -71,58 +74,117 @@ export const TaskList: React.FC<{ refreshTrigger: number }> = ({ refreshTrigger 
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'PENDING': return <Badge color="gray">Pending</Badge>;
-            case 'PROCESSING': return <Badge color="blue" variant="light">Processing</Badge>;
+            case 'TRANSCRIBING': return <Badge color="blue" variant="light">Transcribing</Badge>;
+            case 'ANALYZING': return <Badge color="violet" variant="light">Analyzing</Badge>;
             case 'COMPLETED': return <Badge color="green">Completed</Badge>;
             case 'FAILED': return <Badge color="red">Failed</Badge>;
             default: return <Badge color="gray">{status}</Badge>;
         }
     };
 
-    return (
-        <Paper withBorder p="md" radius="md">
-            <Group justify="space-between" mb="md">
-                <Title order={4}>Transcription History</Title>
-                <ActionIcon variant="light" onClick={fetchTasks} loading={loading}>
-                    <IconRefresh size={16} />
-                </ActionIcon>
-            </Group>
+    const formatDate = (dateStr: string) => {
+        try {
+            const d = new Date(dateStr);
+            return d.toLocaleString('en-AU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return dateStr;
+        }
+    };
 
-            <Table highlightOnHover>
-                <Table.Thead>
-                    <Table.Tr>
-                        <Table.Th>Task ID</Table.Th>
-                        <Table.Th>Filename</Table.Th>
-                        <Table.Th>Status</Table.Th>
-                        <Table.Th>Actions</Table.Th>
-                    </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                    {tasks.map((task: TranscriptionTask) => (
-                        <Table.Tr key={task.id}>
-                            <Table.Td>{task.id.slice(0, 8)}...</Table.Td>
-                            <Table.Td>{task.filename || 'Unknown'}</Table.Td>
-                            <Table.Td>{getStatusBadge(task.status)}</Table.Td>
-                            <Table.Td>
-                                {task.status === 'COMPLETED' && (
-                                    <ActionIcon
-                                        variant="light"
-                                        color="blue"
-                                        onClick={() => navigate(`/task/${task.id}`)}
-                                        title="View Workspace"
-                                    >
-                                        <IconEye size={16} />
-                                    </ActionIcon>
-                                )}
-                            </Table.Td>
-                        </Table.Tr>
-                    ))}
-                    {tasks.length === 0 && !loading && (
+    const getDisplayName = (task: TranscriptionTask) => {
+        if (task.patient_name) return task.patient_name;
+        if (task.filename) return task.filename;
+        return 'Untitled';
+    };
+
+    const handleDeleteClick = (task: TranscriptionTask) => {
+        setTaskToDelete(task);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!taskToDelete) return;
+        setDeleting(true);
+        try {
+            await deleteTask(taskToDelete.id);
+            setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+            setDeleteModalOpen(false);
+            setTaskToDelete(null);
+        } catch (err) {
+            console.error('Delete failed', err);
+            alert('Failed to delete task.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    return (
+        <>
+            <Paper withBorder p="md" radius="md">
+                <Group justify="space-between" mb="md">
+                    <Title order={4}>Transcription History</Title>
+                    <ActionIcon variant="light" onClick={fetchTasks} loading={loading}>
+                        <IconRefresh size={16} />
+                    </ActionIcon>
+                </Group>
+
+                <Table highlightOnHover>
+                    <Table.Thead>
                         <Table.Tr>
-                            <Table.Td colSpan={4} style={{ textAlign: 'center' }}>No tasks found.</Table.Td>
+                            <Table.Th>Patient</Table.Th>
+                            <Table.Th>Created</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th>Actions</Table.Th>
                         </Table.Tr>
-                    )}
-                </Table.Tbody>
-            </Table>
-        </Paper>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {tasks.map((task: TranscriptionTask) => (
+                            <Table.Tr key={task.id}>
+                                <Table.Td fw={500}>{getDisplayName(task)}</Table.Td>
+                                <Table.Td c="dimmed">{formatDate(task.created_at)}</Table.Td>
+                                <Table.Td>{getStatusBadge(task.status)}</Table.Td>
+                                <Table.Td>
+                                    <Group gap="xs">
+                                        {task.status === 'COMPLETED' && (
+                                            <ActionIcon
+                                                variant="light"
+                                                color="blue"
+                                                onClick={() => navigate(`/task/${task.id}`)}
+                                                title="View Workspace"
+                                            >
+                                                <IconEye size={16} />
+                                            </ActionIcon>
+                                        )}
+                                        <ActionIcon
+                                            variant="light"
+                                            color="red"
+                                            onClick={() => handleDeleteClick(task)}
+                                            title="Delete Task"
+                                        >
+                                            <IconTrash size={16} />
+                                        </ActionIcon>
+                                    </Group>
+                                </Table.Td>
+                            </Table.Tr>
+                        ))}
+                        {tasks.length === 0 && !loading && (
+                            <Table.Tr>
+                                <Table.Td colSpan={4} style={{ textAlign: 'center' }}>No tasks found.</Table.Td>
+                            </Table.Tr>
+                        )}
+                    </Table.Tbody>
+                </Table>
+            </Paper>
+
+            <Modal opened={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirm Deletion" centered>
+                <Text size="sm" mb="lg">
+                    Are you sure you want to permanently delete the record for <b>{taskToDelete ? getDisplayName(taskToDelete) : ''}</b>? This action cannot be undone.
+                </Text>
+                <Group justify="flex-end">
+                    <Button variant="default" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+                    <Button color="red" loading={deleting} onClick={confirmDelete}>Delete</Button>
+                </Group>
+            </Modal>
+        </>
     );
 };

@@ -4,6 +4,7 @@ export interface TranscriptionTask {
     id: string;
     status: 'PENDING' | 'TRANSCRIBING' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
     filename?: string;
+    patient_name?: string;
     transcript?: string;
     soap_note?: string;
     error_message?: string;
@@ -22,15 +23,21 @@ export const getTask = async (id: string): Promise<TranscriptionTask> => {
     return response.data;
 };
 
-export const uploadAudio = async (file: File, language: string = 'auto'): Promise<{ task_id: string; status: string }> => {
+export const uploadAudio = async (file: File, language: string = 'auto', patientName: string = ''): Promise<{ task_id: string; status: string }> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('language', language);
+    formData.append('patient_name', patientName);
 
     const response = await apiClient.post('/upload', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
     });
+    return response.data;
+};
+
+export const deleteTask = async (id: string): Promise<{ message: string }> => {
+    const response = await apiClient.delete(`/tasks/${id}`);
     return response.data;
 };

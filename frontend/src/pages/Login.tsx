@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, Alert } from '@mantine/core';
+import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, Alert, Anchor } from '@mantine/core';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loginAPI } from '../api/auth';
 import { useAuthStore } from '../store/useAuthStore';
@@ -69,6 +69,12 @@ export const Login: React.FC = () => {
                         Sign in
                     </Button>
                 </form>
+                <Text ta="center" mt="md" size="sm">
+                    Don&apos;t have an account?{' '}
+                    <Anchor component="button" type="button" onClick={() => navigate('/register')}>
+                        Register here
+                    </Anchor>
+                </Text>
             </Paper>
         </Container>
     );

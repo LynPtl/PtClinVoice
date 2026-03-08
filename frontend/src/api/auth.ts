@@ -13,3 +13,8 @@ export const loginAPI = async (username: string, password: string) => {
     });
     return response.data;
 };
+
+export const registerAPI = async (username: string, password: string) => {
+    const response = await apiClient.post('/auth/register', { username, password });
+    return response.data;
+};

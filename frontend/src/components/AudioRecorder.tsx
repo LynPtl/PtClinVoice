@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Button, Group, Stack, Text, Select, Paper } from '@mantine/core';
+import { Button, Group, Stack, Text, Select, Paper, TextInput } from '@mantine/core';
 import { IconMicrophone, IconPlayerStop, IconUpload } from '@tabler/icons-react';
 import { uploadAudio } from '../api/tasks';
 
@@ -8,6 +8,7 @@ export const AudioRecorder: React.FC<{ onUploadSuccess: () => void }> = ({ onUpl
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [language, setLanguage] = useState<string>('auto');
+    const [patientName, setPatientName] = useState('');
     const [isUploading, setIsUploading] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -75,9 +76,10 @@ export const AudioRecorder: React.FC<{ onUploadSuccess: () => void }> = ({ onUpl
         try {
             // Convert Blob to File, standardizing as .webm
             const file = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
-            await uploadAudio(file, language);
+            await uploadAudio(file, language, patientName);
             setAudioBlob(null);
             setRecordingTime(0);
+            setPatientName('');
             onUploadSuccess();
         } catch (err) {
             console.error('Upload failed', err);
@@ -134,6 +136,13 @@ export const AudioRecorder: React.FC<{ onUploadSuccess: () => void }> = ({ onUpl
                         w={200}
                     />
                 </Group>
+
+                <TextInput
+                    label="Patient Name (Optional)"
+                    placeholder="e.g. John Doe or MRN-12345"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.currentTarget.value)}
+                />
 
                 <Group justify="flex-end">
                     {audioBlob && (

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { IconUpload } from '@tabler/icons-react';
-import { Text, Group, Button, Paper, Select, Stack } from '@mantine/core';
+import { Text, Group, Button, Paper, Select, Stack, TextInput } from '@mantine/core';
 
 export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUploadSuccess }) => {
     const [file, setFile] = useState<File | null>(null);
     const [language, setLanguage] = useState<string>('auto');
+    const [patientName, setPatientName] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,8 +19,9 @@ export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUp
         setLoading(true);
         try {
             const { uploadAudio } = await import('../api/tasks');
-            await uploadAudio(file, language);
+            await uploadAudio(file, language, patientName);
             setFile(null);
+            setPatientName('');
             onUploadSuccess();
         } catch (error) {
             console.error('Upload failed', error);
@@ -64,6 +66,13 @@ export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUp
                         w={200}
                     />
                 </Group>
+
+                <TextInput
+                    label="Patient Name (Optional)"
+                    placeholder="e.g. John Doe or MRN-12345"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.currentTarget.value)}
+                />
 
                 <Group justify="flex-end">
                     <Button loading={loading} onClick={handleUpload} disabled={!file} color="blue">

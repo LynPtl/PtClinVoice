@@ -68,6 +68,31 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         access_token = create_access_token(data={"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
+def register(req: RegisterRequest):
+    """
+    Phase 5.2: Open User Self-Registration.
+    """
+    if not req.username or len(req.username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
+    if not req.password or len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+    
+    with Session(engine) as session:
+        existing = session.exec(select(User).where(User.username == req.username)).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already exists.")
+        
+        new_user = User(username=req.username, hashed_password=get_password_hash(req.password))
+        session.add(new_user)
+        session.commit()
+    
+    return {"message": "Registration successful. Please log in."}
+
 @app.get("/api/tasks/{task_id}", response_model=TranscriptionTask)
 def get_task_status(task_id: str, current_user: User = Depends(get_current_user)):
     """
@@ -83,6 +108,21 @@ def get_task_status(task_id: str, current_user: User = Depends(get_current_user)
             raise HTTPException(status_code=403, detail="Not authorized to access this task")
             
         return task
+
+@app.delete("/api/tasks/{task_id}", status_code=status.HTTP_200_OK)
+def delete_task(task_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Phase 5.2: Hard-delete a task. Only the task owner can delete.
+    """
+    with Session(engine) as session:
+        task = session.get(TranscriptionTask, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this task")
+        session.delete(task)
+        session.commit()
+    return {"message": "Task deleted successfully."}
 
 @app.get("/api/tasks")
 def list_tasks(current_user: User = Depends(get_current_user)):
@@ -163,6 +203,7 @@ def upload_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     language: str = Form("auto"),
+    patient_name: str = Form(""),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -187,6 +228,7 @@ def upload_audio(
             status=TaskStatus.PENDING,
             owner_id=current_user.id,
             filename=file.filename,
+            patient_name=patient_name if patient_name else None,
             language=language
         )
         session.add(new_task)
