@@ -3,9 +3,12 @@
 本指南专为开发者与测试专员 (QA) 编写，指导如何在本地同时拉起 **FastAPI 后端** 与 **React / Vite 前端**，并执行完整的单元与全链路测试。
 
 ## 1. 环境准备 (Prerequisites)
-1. 确保安装了 `python >= 3.10` 且已安装 `ffmpeg` (处理音频流依赖)。
-2. 确保安装了 `node >= 18` 与 `npm`。
-3. 拥有一个可用的 DeepSeek API Key。
+1. 确保已在系统安装 `ffmpeg` (处理流媒体与音频格式的底层核心依赖)：
+   - **Ubuntu/Debian**: `sudo apt install ffmpeg`
+   - **MacOS**: `brew install ffmpeg`
+2. 确保安装了 `python >= 3.10`
+3. 确保安装了 `node >= 18` 与 `npm`。
+4. 拥有一个可用的 DeepSeek API Key。
 
 ## 2. 后端核心栈启动 (Backend API Server)
 
@@ -19,12 +22,16 @@
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-3. **配置凭证 (新建 `.env` 文件)**:
+4. **配置凭证 (新建 `.env` 文件)**:
    ```env
    DEEPSEEK_API_KEY=your_key_here
    JWT_SECRET_KEY=dev_local_secret
    ```
-4. **启动 FastAPI 网关**:
+5. **初始化并缓存 Whisper 离线模型避免运行时阻塞**:
+   ```bash
+   python3 -c 'from faster_whisper import WhisperModel; print("Downloading small model..."); WhisperModel("small", device="cpu", compute_type="int8")'
+   ```
+6. **启动 FastAPI 网关**:
    ```bash
    PYTHONPATH=. uvicorn app.main:app --reload --port 8000
    ```

@@ -26,6 +26,7 @@ class TranscriptionTask(SQLModel, table=True):
     
     # Metadata
     filename: Optional[str] = None
+    language: str = Field(default="auto")
     
     # Store the actual results
     transcript: Optional[str] = None

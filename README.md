@@ -47,7 +47,12 @@ docker-compose up -d --build
 ### 2. 本地联调测试与双端架构启动 (Full Stack Development)
 由于项目升级至包含现代 Web 控制台的全栈架构，请使用以下步骤进行完全拟真的系统测试。详细分离指令请参阅：[快速本地联调向导](docs/local_testing_guide.md)。
 
-**1. 开启 FastAPI 数据核心引擎**
+**1. 准备系统依赖 (FFmpeg)**
+Faster-Whisper 要求系统环境中安装 `ffmpeg` 核心库。
+*   **Linux (Ubuntu/Debian)**: `sudo apt update && sudo apt install ffmpeg`
+*   **MacOS**: `brew install ffmpeg`
+
+**2. 开启 FastAPI 数据核心引擎**
 在根目录启动具备 CUDA 可加速条件与持久化的后端：
 ```bash
 python3 -m venv .venv
@@ -55,7 +60,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 
+# 提前下载并缓存临床级(Small)多语种翻译模型避免超时
+python3 -c 'from faster_whisper import WhisperModel; WhisperModel("small", device="cpu", compute_type="int8")'
+
 # 暴露 8000 端口
+PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 ```
 

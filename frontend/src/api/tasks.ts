@@ -22,9 +22,10 @@ export const getTask = async (id: string): Promise<TranscriptionTask> => {
     return response.data;
 };
 
-export const uploadAudio = async (file: File): Promise<{ task_id: string; status: string }> => {
+export const uploadAudio = async (file: File, language: string = 'auto'): Promise<{ task_id: string; status: string }> => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('language', language);
 
     const response = await apiClient.post('/upload', formData, {
         headers: {

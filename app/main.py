@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status, UploadFile, File, Query
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status, UploadFile, File, Query, Form
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordRequestForm
@@ -34,7 +34,11 @@ app = FastAPI(
 UPLOAD_DIR = "data/uploads"
 try:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-except PermissionError:
+    test_file = os.path.join(UPLOAD_DIR, ".test_write")
+    with open(test_file, "w") as f:
+        f.write("test")
+    os.remove(test_file)
+except (PermissionError, OSError):
     UPLOAD_DIR = "uploads"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -158,12 +162,13 @@ def create_mock_transcription(
 def upload_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    language: str = Form("auto"),
     current_user: User = Depends(get_current_user)
 ):
     """
     Phase 3: Secure Audio Upload with Burn-After-Reading lifecycle.
     """
-    if not file.filename.endswith(('.wav', '.mp3', '.m4a')):
+    if not file.filename.endswith(('.wav', '.mp3', '.m4a', '.webm', '.ogg')):
         raise HTTPException(status_code=400, detail="Invalid audio format")
         
     task_id = str(uuid.uuid4())
@@ -181,7 +186,8 @@ def upload_audio(
             id=task_id, 
             status=TaskStatus.PENDING,
             owner_id=current_user.id,
-            filename=file.filename
+            filename=file.filename,
+            language=language
         )
         session.add(new_task)
         session.commit()

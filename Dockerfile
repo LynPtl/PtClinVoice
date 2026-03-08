@@ -18,11 +18,12 @@ WORKDIR /app
 # Copy dependency file first to leverage Docker layer caching
 COPY requirements.txt .
 
-# Install Python dependencies and pre-download the SpaCy model
-# This ensures the 12MB model is baked into the image, avoiding runtime downloads
+# Install Python dependencies and pre-download the SpaCy model and Whisper model
+# This ensures the 12MB NLP model and 460MB Voice model are baked into the image, avoiding runtime downloads
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+    python -m spacy download en_core_web_sm && \
+    python -c 'from faster_whisper import WhisperModel; WhisperModel("small", device="cpu", compute_type="int8")'
 
 # Copy the rest of the application code
 COPY . .

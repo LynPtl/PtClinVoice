@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { IconUpload } from '@tabler/icons-react';
-import { Text, Group, Button, Paper } from '@mantine/core';
+import { Text, Group, Button, Paper, Select, Stack } from '@mantine/core';
 
 export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUploadSuccess }) => {
-    // We will integrate Mantine Dropzone or just a native file input for simplicity first
     const [file, setFile] = useState<File | null>(null);
+    const [language, setLanguage] = useState<string>('auto');
     const [loading, setLoading] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,7 +18,7 @@ export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUp
         setLoading(true);
         try {
             const { uploadAudio } = await import('../api/tasks');
-            await uploadAudio(file);
+            await uploadAudio(file, language);
             setFile(null);
             onUploadSuccess();
         } catch (error) {
@@ -31,29 +31,46 @@ export const UploadDropzone: React.FC<{ onUploadSuccess: () => void }> = ({ onUp
 
     return (
         <Paper withBorder p="md" radius="md">
-            <Group justify="space-between">
-                <Group>
-                    <input
-                        type="file"
-                        accept="audio/*"
-                        onChange={handleFileChange}
-                        style={{ display: 'none' }}
-                        id="audio-upload-input"
+            <Stack gap="md">
+                <Group justify="space-between" align="flex-start">
+                    <Group align="center">
+                        <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleFileChange}
+                            style={{ display: 'none' }}
+                            id="audio-upload-input"
+                        />
+                        <Button
+                            component="label"
+                            htmlFor="audio-upload-input"
+                            variant="light"
+                            leftSection={<IconUpload size={16} />}
+                        >
+                            Select Audio File
+                        </Button>
+                        {file && <Text size="sm" fw={500}>{file.name}</Text>}
+                    </Group>
+                    <Select
+                        label="Source Language"
+                        placeholder="Select language"
+                        value={language}
+                        onChange={(value) => setLanguage(value || 'auto')}
+                        data={[
+                            { value: 'auto', label: 'Auto-Detect (Default)' },
+                            { value: 'en', label: 'English' },
+                            { value: 'ar', label: 'Arabic' },
+                        ]}
+                        w={200}
                     />
-                    <Button
-                        component="label"
-                        htmlFor="audio-upload-input"
-                        variant="light"
-                        leftSection={<IconUpload size={16} />}
-                    >
-                        Select Audio File
-                    </Button>
-                    {file && <Text size="sm" fw={500}>{file.name}</Text>}
                 </Group>
-                <Button loading={loading} onClick={handleUpload} disabled={!file} color="blue">
-                    Start Transcription
-                </Button>
-            </Group>
+
+                <Group justify="flex-end">
+                    <Button loading={loading} onClick={handleUpload} disabled={!file} color="blue">
+                        Start Transcription
+                    </Button>
+                </Group>
+            </Stack>
         </Paper>
     );
 };

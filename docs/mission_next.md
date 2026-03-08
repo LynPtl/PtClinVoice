@@ -44,10 +44,17 @@
     *   **Backend**: 补充 `POST /api/auth/register`，包含密码的哈希加盐存储 (bcrypt) 及输入合法性校验。
     *   **Frontend**: 增加精美的注册页面表单，与登录逻辑平滑衔接，完善 JWT 下发。
 
-## 3. 进阶临床交互 (Advanced Clinical Interaction)
+## 3. 进阶临床交互与任务管理 (Advanced Clinical UX & Task Management)
+*   **临床化标识替换 (Clinical Identifiers)**:
+    *   目前前端 Dashboard 列表全部显示无语意的 Task ID 和乱码文件名。
+    *   **改进**: 允许在录音/上传阶段让医生输入“患者姓名 (Patient Name)” 或 “病历号 (MRN)”；若未提供，则后端通过 LLM 自动给这段病历生成一个精简的 Title。
 *   **富文本可编辑 SOAP (Editable SOAP Text)**:
     *   在前端工作台 (Workspace) 右侧，引入现代富文本编辑器框架（如 TipTap, Quill 等）。
     *   打破原先纯结构化只读的限制，允许医生在最终确认归档前，灵活地对 AI 生成的临床笔记进行增删、高亮、备注等深度校对操作。
+*   **废弃病历管理 (Task Deletion & Curation)**:
+    *   增加对低质量录音、错误音频或无效数据的**硬删除/软删除**功能。
+    *   **Backend**: 补充 `DELETE /api/tasks/{task_id}` 接口，确保同步从数据库中清理记录。
+    *   **Frontend**: 在 Dashboard 列表每一项增加删除按钮及二次确认弹窗。
 
 ## 4. 模型监控与质量控制 (Model Quality Assurance)
 *   **STT 准确率自动化专项测试 (STT/Translation Accuracy Testing)**:

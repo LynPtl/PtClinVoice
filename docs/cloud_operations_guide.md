@@ -32,123 +32,99 @@ python3 test_real_deepseek_api.py
 
 ---
 
-## 2. 后续将要集成的云端操作 (Upcoming Workloads - Phase 2+)
+## 2. Web 服务器托管与 AWS EC2 实例部署指南 (Phase 2+)
 
-*(以下条目将在后续迭代中更新，提供详尽的参数配置与部署指导)*
+为了在云端稳定运行包含了本地 STT 引擎和全栈 Web 架构的 PtClinVoice，我们将使用 **Amazon Web Services (AWS) EC2** 作为核心托管平台。
 
-### 2.1 Web 服务器托管与 Oracle Cloud ARM64 实例申领 (Phase 2)
-考虑到项目核心 AI 的低计算配额与极致降本需求，我们的目标生产环境为 **Oracle Cloud (甲骨文云) 的 Always Free ARM64 (Ampere A1) 实例**。
+由于我们在 Docker 镜像中预先烘焙了 Faster-Whisper `small` 模型 (约 460MB) 和 `SpaCy` 模型，转录时有一定的内存峰值消耗，**强烈建议选择至少 4GB 内存的实例（如 `t3.medium` 或 `t3.large`）**，而非 1GB 的免费层 `t2.micro`（极容易 OOM 崩溃）。
 
-**运维实操指南 (Oracle Cloud Provisioning)**：
-1. **注册与绑卡**：访问 `cloud.oracle.com` 注册账号并验证外币信用卡。
-2. **创建计算实例 (Compute)**：
-   - 导航至：`Compute` -> `Instances` -> `Create Instance`。
-   - **Image (镜像)**: 选择 `Canonical Ubuntu 22.04/24.04 (aarch64)`。
-   - **Shape (规格)**: 选择 `Ampere (ARM)` 架构下的 `VM.Standard.A1.Flex`。
-   - **资源配置上限** (关键): 由于这是 Flex (弹性) 实例，默认显示可能只有 1 OCPU 和 6GB 内存。请在 OCPU 数选择 `4`，Memory (内存) 选择 `24GB`。(这是免费额度的上限，能够满足多路 STT 引控计算需求)。
-     - **[WARNING] 容量耗尽告警 (Out of Capacity)**: 若执行创建时系统提示 `Out of capacity for shape VM.Standard.A1.Flex`，此为 Oracle 免费宿主机池常见现象（通常指向所选可用区当前无空闲 ARM 物理资源）。**缓解方案**：尝试更换可用域（Availability Domain），或错峰重试。在此期间，项目代码完全兼容在本地或常规 x86 服务器上进行测试验证。
-3. **网络连通性编排 (Networking & Security)**：
-   默认情况下，Oracle 的实例即使绑定了公网 IP 也是处于“失联”状态的。必须执行以下链路打通：
-   - **创建 VCN (虚拟云网络)**: 导航至 Networking -> Virtual Cloud Networks。新建 VCN (如 `10.0.0.0/24`) 与 Public Subnet。**无需分配 IPv6**。
-   - **配置互联网网关 (Internet Gateway)**: 在 VCN 详情页左侧点击 Internet Gateways，新建一个网关并命名。
-   - **更新路由表 (Route Table)**: 点击 VCN 左侧的 Route Tables，进入 `Default Route Table`，添加规则：Target Type 选 `Internet Gateway`，Destination CIDR 填 `0.0.0.0/0`，Target 选刚才建好的网关。（这一步让服务器的公网流量能找到出口）。
-   - **放行安全列表 (Security List)**: 点击 VCN 左侧的 Security Lists，进入 `Default Security List`。默认已放行 SSH (端口 `22`)。为了后续 API 访问，请**务必添加 Ingress (入站) 规则**：Source CIDR `0.0.0.0/0`，IP Protocol `TCP`，Destination Port Range 填 `80,443,8000` (8000为后续 FastAPI 端口)。
-4. **绑定密钥与实例开通**:
-   - 在创建实例页面的网络层，选择刚才配置好的 VCN 和 Public Subnet。
-   - **关键环节**: 在 `Add SSH keys` 处选择 `Save private key`，一定要下载 `.key` 文件，这是唯一登录凭证。点击创建。
-4. **服务器出厂预装与 OS 防火墙放行**：使用 SSH 登录这台新机器。
+### 2.1 启动 AWS EC2 实例 (Launch EC2 Instance)
+
+1. **登录 AWS 管理控制台**并导航至 **EC2 Dashboard**。
+2. 点击橙色按钮 **Launch instance (启动实例)**。
+3. **Name and tags (名称和标签)**: 输入实例名称，例如 `PtClinVoice-Prod-Server`。
+4. **Application and OS Images (Amazon Machine Image)**:
+   - 搜索并选择 **Ubuntu**。
+   - 版本选择 **Ubuntu Server 22.04 LTS (HVM) 或是 24.04 LTS**，架构保留默认的 **64-bit (x86_64)**。
+5. **Instance type (实例类型)**:
+   - 在下拉菜单中选择 **`t3.medium`** (2 vCPU, 4 GiB 内存) 或更高配置。
+6. **Key pair (密钥对)**:
+   - 选择一个现有的密钥对，或者点击 **Create new key pair**。
+   - 命名为 `ptclinvoice-key`，类型 `RSA`，格式 `.pem`。**务必将下载的 `.pem` 文件妥善保管**，这是 SSH 登录的唯一凭证。
+7. **Network settings (网络设置)**:
+   - 点击 **Edit**。确保选择了拥有公网访问能力的 VPC 和 Subnet。
+   - **Auto-assign public IP**: 设置为 **Enable (启用)**。
+   - **Firewall (security groups)**: 选择 **Create security group**。
+   - **Inbound security group rules (入站规则)**：在默认放行 SSH 以外，点击 **Add security group rule**，增加以下规则放路对外界的访问：
+     - 类型: **HTTP**, 端口范围: `80`, 来源: `Anywhere (0.0.0.0/0)`
+     - 类型: **Custom TCP**, 端口范围: `8000`, 来源: `Anywhere (0.0.0.0/0)` (FastAPI直接测试端口，可选)
+8. **Configure storage (配置存储)**:
+   - 将根卷大小调整为至少 **20 GiB** (gp3)，因为拉取和构建 Docker 镜像需要一定的磁盘空间。
+9. 点击右下角的 **Launch instance** 完成创建。
+
+### 2.2 连接到服务器并初始化环境 (Server Initialization)
+
+1. 在 EC2 实例列表中，选中刚创建的实例，复制其 **Public IPv4 address (公网 IP)**。
+2. 在您的本地终端中，通过 SSH 连接到服务器（注意替换密钥路径和 IP 地址）：
+   ```bash
+   # 修改密钥文件权限
+   chmod 400 ptclinvoice-key.pem
    
-    **操作系统层安全组拦截机制**：除了云端控制台的 Security List，Oracle 的 Ubuntu 镜像默认在操作系统级别通过 `iptables` 限制了除端口 22 以外的所有入站请求。您必须首先执行内核级的网络端口放行：
-    ```bash
-    # 放行 8000 (FastAPI), 80 (HTTP), 443 (HTTPS) 端口
-    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
-    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-    sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-    
-    # 持久化 iptables 规则以防止系统重启后失效
-    sudo netfilter-persistent save
-    ```
-    
-    然后安装我们的基础环境：
-    ```bash
-    sudo apt update && sudo apt install -y docker.io docker-compose git ffmpeg
-    ```
-至此，最底层的免费云宿主机就搭好了，后续将配合 GitHub Actions 和多架构 Docker 无缝承接构建流。
+   # SSH 登录目标服务器
+   ssh -i "ptclinvoice-key.pem" ubuntu@<您的EC2公网IP>
+   ```
 
-### 2.2 Docker 容器云编排测试 (Phase 2.3+)
-由于我们的 `ghcr.io/lynptl/ptclinvoice:latest` 镜像是严格基于 `linux/amd64` 构建，并且全量包含好了 `12MB SpaCy` 与 `ffmpeg` 依赖底包，它非常适合在您的 Oracle VM.Standard.E5.Flex (AMD x86_64) 或其他架构上进行“即开即用”的空降测试。
+3. **服务器出厂预装 (Docker & Git)**：
+   登录成功后，执行以下命令安装基础设施引擎：
+   ```bash
+   # 更新包管理器并安装 Docker, Docker-Compose 和 Git
+   sudo apt update
+   sudo apt install -y docker.io docker-compose git
+   
+   # 将当前 ubuntu 用户加入 docker 组以避免每次都敲 sudo
+   sudo usermod -aG docker $USER
+   ```
+   *(注：加入 docker 组后，最好断开 SSH 重新连接一次，让权限组立刻生效。)*
 
-为了遵守我们定下的“极简与不可变基础设施”底线，您在云端实例上**完全不需要拉取整个 Git 仓库的代码**。请通过 SSH 登入您的 Oracle Cloud 实例，依次执行：
+### 2.3 注入隐私数据防线 (Secure Environment Setup)
 
-#### 第一步：配置网络端点与部署容器引擎 (若未经初始化)
-**1. 放行 Oracle 操作系统级防火墙**
-很多时候在网页端 (Security List) 开放了 8000 端口，但请求仍旧无响应，是因为 Oracle 的 Ubuntu 模板自带严苛的本地 `iptables` 规则。请强行打通操作系统层的拦截：
-```bash
-# 在 Linux 防火墙规则顶层添加针对 8000, 80, 443 端口的入站放行许可
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-
-# 持久化防火墙规则
-sudo netfilter-persistent save
-```
-
-**2. 刷新包记录并装配 Docker**
-```bash
-sudo apt update && sudo apt install -y docker.io docker-compose
-sudo systemctl enable --now docker
-sudo usermod -aG docker $USER
-# (若新将用户拉入 docker 用户组，建议退出 SSH 重登录使权限生效)
-```
-
-#### 第二步：注入隐私数据防线 (构建 `.env` 与隔离挂载点)
-```bash
-# 构建工程专属沙盒目录
-mkdir -p ~/ptclinvoice_deploy/data
-cd ~/ptclinvoice_deploy
-
-# >>> [AUTHORIZATION CHECKPOINT]: The only manual step required <<<
-# 创建隐形环境变量记录表，并贴入您的真实 DeepSeek API Key
-cat << 'EOF' > .env
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-EOF
-```
-
-#### 第三步：拉取仓库源码与双容器全栈编排 (Full-Stack Orchestration)
-由于依赖底包和核心算法可能会经历高频本地调优（例如：STT 语言参数修复、隐私过滤修复），为了确保您能拿到绝对最新的全量代码（不依赖尚未 Push 到云端 Registry 的镜像缓存），请使用 Git 拉取源码并在本地触发 Build：
+在服务器上创建存放数据和配置的专属沙盒目录：
 
 ```bash
-# 1. 克隆托管仓库
+# 1. 克隆代码仓库
 git clone https://github.com/lynptl/PtClinVoice.git
 cd PtClinVoice
 
-# 2. 将您刚才生成的 .env 密钥配置文件移动到根目录
-mv ../.env ./
+# 2. 创建持久化数据挂载目录
+mkdir -p data
 
-# 3. 强制触发本地联合构建并拉起双容器
-sudo docker-compose up -d --build
+# 3. >>> [AUTHORIZATION CHECKPOINT] <<<
+# 创建隐形环境变量记录表，并贴入您的真实 DeepSeek API Key 与自生成的 JWT 密钥
+cat << 'EOF' > .env
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+JWT_SECRET_KEY=your_secure_random_production_key_here
+EOF
+```
 
-# 4. 立刻探活后端数据链路
+### 2.4 全栈云端编排 (Full-Stack Docker Orchestration)
+
+我们的 `docker-compose.yml` 已经对前端 Nginx 代理和后端 FastAPI 进行了深度编排，且最新版本的后端 `Dockerfile` 内置了对 `ffmpeg`, 语言模型 `en_core_web_sm` 以及 STT `small` 引擎的烘焙（Bake-in）。
+
+现在，您可以直接在服务器上拉起生产环境：
+
+```bash
+# 执行全栈联合构建并作为守护进程启动
+# 由于包含了底包编译，初次构建可能需要 3-5 分钟左右
+docker-compose up -d --build
+
+# 立刻探活后端数据链路，确认容器未因 OOM 或其他异常退出
 curl http://localhost:8000/health
 # 预期正常返回：{"status": "ok", "service": "PtClinVoice API"}
 ```
 
->**架构注记**：`docker-compose.yml` 中的前端静态站通过轻量级 Nginx (挂载在宿主机端口 `80`) 进行分发。内置反向代理会自动将任何 `/api/*` 的请求无缝代理至背后的 `ptclinvoice-api:8000` 节点。
+>**架构注记**：`docker-compose.yml` 中的前端静态站通过轻量级 Nginx 挂载在宿主机端口 `80` 进行分发。内置的反向代理会自动将发往 `/api/*` 的请求无缝路由至背面的 `ptclinvoice-api:8000` 节点，彻底杜绝云端的跨域 (CORS) 阻断问题。
 
-**[PASS] 视觉交互系统走查流程 (E2E Cloud Dashboard QA)**：
-1. 打开浏览器输入 `http://<您的Oracle公网IP>` 即可直接触达部署在 Nginx 中的前端临床交互控制台。
-2. 于 `/login` 登录病区账户，此时 Axios 将把凭证精准无误地由 Nginx Reverse-Proxy 透传给后方 Python JWT 守卫引擎。
-3. 拖拽音频进入 Upload 流水线；验证 Nginx 防阻拦特性对 SSE Server-Sent Events 事件流的高速透传。
-
-### 2.3 手工容器化构建指南 (本地打包特供)
-若云平台拉取 GHCR 镜像受阻，或您本地执行特殊分支改构，请使用以下双层编译架构进行手工落盘：
-```bash
-# 构建后端含 ffmpeg 与 spacy 依赖的厚底包（约 800MB）
-docker build -t ghcr.io/lynptl/ptclinvoice:latest .
-
-# 构建前端含 React 编译阶段的 Nginx 代理包
-docker build -t ghcr.io/lynptl/ptclinvoice-web:latest ./frontend
-
-# 启动全栈
-docker-compose up -d
-```
+#### [PASS] 视觉交互系统走查流程 (E2E Cloud Dashboard QA)：
+1. 打开浏览器，直接访问 `http://<您的EC2公网IP>`。您应该能看到熟悉的登录界面。
+2. 使用先前创建的账户进行系统登录。此时前端会把凭证通过 Nginx Reverse-Proxy 透传给后方 Python JWT 守卫引擎。
+3. 进入 Dashboard 后尝试上传一段临床录音，验证云端的 Server-Sent Events (SSE) 事件流能否顺利完成 `PENDING` -> `TRANSCRIBING` -> `ANALYZING` -> `COMPLETED` 的全生命周期状态推送！

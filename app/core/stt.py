@@ -4,7 +4,7 @@ import os
 import time
 from typing import Optional, Dict, Any
 
-def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.connection.Connection):
+def _stt_worker(audio_path: str, model_size: str, whisper_task: str, whisper_language: Optional[str], child_conn: multiprocessing.connection.Connection):
     """
     Subprocess execution context for Faster-Whisper.
     Imports are isolated here to ensure all large objects belong solely to the child process memory space.
@@ -16,12 +16,18 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
         try:
             model = WhisperModel(model_size, device="auto", compute_type="default")
             initial_prompt = "Hello, this is a standard medical transcription. Please use proper capitalization and punctuation."
-            segments, info = model.transcribe(
-                audio_path, 
-                beam_size=5,
-                initial_prompt=initial_prompt,
-                language="en"
-            )
+            
+            kwargs = {
+                "beam_size": 5,
+                "initial_prompt": initial_prompt,
+                "task": whisper_task,
+                "vad_filter": True,
+                "vad_parameters": dict(min_silence_duration_ms=500)
+            }
+            if whisper_language:
+                kwargs["language"] = whisper_language
+                
+            segments, info = model.transcribe(audio_path, **kwargs)
             # Exhaust generator
             text = " ".join([seg.text.strip() for seg in segments]).strip()
         except Exception as e:
@@ -29,12 +35,18 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
                 # fallback to CPU if missing libcublas or other CUDA/GPU dependencies
                 model = WhisperModel(model_size, device="cpu", compute_type="default")
                 initial_prompt = "Hello, this is a standard medical transcription. Please use proper capitalization and punctuation."
-                segments, info = model.transcribe(
-                    audio_path, 
-                    beam_size=5,
-                    initial_prompt=initial_prompt,
-                    language="en"
-                )
+                
+                kwargs = {
+                    "beam_size": 5,
+                    "initial_prompt": initial_prompt,
+                    "task": whisper_task,
+                    "vad_filter": True,
+                    "vad_parameters": dict(min_silence_duration_ms=500)
+                }
+                if whisper_language:
+                    kwargs["language"] = whisper_language
+                    
+                segments, info = model.transcribe(audio_path, **kwargs)
                 text = " ".join([seg.text.strip() for seg in segments]).strip()
             else:
                 raise e
@@ -47,7 +59,7 @@ def _stt_worker(audio_path: str, model_size: str, child_conn: multiprocessing.co
     finally:
         child_conn.close()
 
-def run_stt_isolated(audio_path: str, model_size: str = "base.en", timeout: int = 300) -> str:
+def run_stt_isolated(audio_path: str, model_size: str = "base.en", whisper_task: str = "transcribe", whisper_language: Optional[str] = None, timeout: int = 300) -> str:
     """
     Runs the Speech-to-Text inference in an isolated process.
     If an Out-Of-Memory (OOM) error occurs, the child process is killed, and an exception is raised in the parent process.
@@ -55,6 +67,8 @@ def run_stt_isolated(audio_path: str, model_size: str = "base.en", timeout: int 
     Args:
         audio_path (str): The absolute path to the audio file.
         model_size (str): The Whisper model size (default: "base.en").
+        whisper_task (str): "transcribe" or "translate".
+        whisper_language (str): Target language for Whisper or None for auto.
         timeout (int): The maximum duration (in seconds) to allow the STT job to run.
         
     Returns:
@@ -72,7 +86,7 @@ def run_stt_isolated(audio_path: str, model_size: str = "base.en", timeout: int 
     
     # Must use 'spawn' to guarantee a fresh memory snapshot instead of 'fork' (which duplicates the parent's memory usage).
     ctx = multiprocessing.get_context('spawn')
-    p = ctx.Process(target=_stt_worker, args=(audio_path, model_size, child_conn))
+    p = ctx.Process(target=_stt_worker, args=(audio_path, model_size, whisper_task, whisper_language, child_conn))
     
     p.start()
     

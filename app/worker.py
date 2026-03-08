@@ -5,6 +5,8 @@ from app.database import engine, TranscriptionTask, TaskStatus
 from app.core.stt import run_stt_isolated
 from app.core.privacy import ClinicalPrivacyFilter
 from app.core.deepseek import DeepSeekClinicalAdapter
+import subprocess
+import tempfile
 
 def process_audio_task(task_id: str, audio_path: str):
     """
@@ -19,14 +21,44 @@ def process_audio_task(task_id: str, audio_path: str):
         
         # 1. Update State to TRANSCRIBING
         task.status = TaskStatus.TRANSCRIBING
+        
+        # Read metadata for Translation pipeline
+        language = task.language or "auto"
+        # Option A strategy: Always translate if Arabic or Auto, otherwise transcribe
+        whisper_task = "translate" if language in ["ar", "auto"] else "transcribe"
+        whisper_language = language if language != "auto" else None
+        
         session.add(task)
         session.commit()
     
     # Run heavy operations outside the DB session context to limit transaction duration
+    enhanced_audio_path = audio_path
     try:
+        # --- AUDIO PREPROCESSING (NOISE REDUCTION) ---
+        # SRE Note: Apply Fast Fourier Transform Denoise (afftdn) and Volume Normalization (loudnorm)
+        # before passing to Whisper. This significantly improves RTF and accuracy on noisy clinical recordings.
+        try:
+            temp_clean_fd, temp_clean_path = tempfile.mkstemp(suffix=".wav")
+            os.close(temp_clean_fd)
+            subprocess.run([
+                "ffmpeg", "-y", "-i", audio_path,
+                "-af", "afftdn=nf=-25,loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", "16000", "-ac", "1",
+                temp_clean_path
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            enhanced_audio_path = temp_clean_path
+        except Exception as ffmpeg_err:
+            print(f"Warning: FFmpeg noise reduction failed, falling back to raw audio: {ffmpeg_err}")
+            enhanced_audio_path = audio_path
+
         # --- LOCAL STT OOM ISOLATION ZONE ---
         # The underlying process is strictly spawned dynamically and drops everything upon crash
-        raw_transcript = run_stt_isolated(audio_path, model_size="tiny")
+        raw_transcript = run_stt_isolated(
+            enhanced_audio_path, 
+            model_size="small",
+            whisper_task=whisper_task,
+            whisper_language=whisper_language
+        )
         
         # 2. Update State to ANALYZING
         with Session(engine) as session:
@@ -73,9 +105,10 @@ def process_audio_task(task_id: str, audio_path: str):
         # --------- BURN AFTER READING DEFENSE ---------
         # SRE Security: Regardless of whether the pipeline succeeded, crashed, or OOM'd,
         # we MUST purge the physical audio file from the server disk to protect PII.
-        if os.path.exists(audio_path) and not "mock" in audio_path and not "tests/" in audio_path:
-            try:
-                os.remove(audio_path)
-            except Exception as cleanup_err:
-                print(f"CRITICAL: Failed to shred audio file {audio_path}: {cleanup_err}")
+        for path_to_clean in [audio_path, enhanced_audio_path]:
+            if os.path.exists(path_to_clean) and not "mock" in path_to_clean and not "tests/" in path_to_clean:
+                try:
+                    os.remove(path_to_clean)
+                except Exception as cleanup_err:
+                    print(f"CRITICAL: Failed to shred audio file {path_to_clean}: {cleanup_err}")
 
